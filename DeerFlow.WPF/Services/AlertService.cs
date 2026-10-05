@@ -280,7 +280,7 @@ public class AlertService : IAlertService
                 type: AlertType.ExperimentAnomaly,
                 severity: AlertSeverity.Medium,
                 title: "实验效果异常",
-                message: $"实验 {experimentName} 评分为 {score:P1}，低于阈值 {_experimentAnomalyThreshold:P0}",
+                message: $"实验 {experimentName} 评分为 {score * 100:F1}%，低于阈值 {_experimentAnomalyThreshold * 100:F0}%",
                 context: new Dictionary<string, object>
                 {
                     ["ExperimentName"] = experimentName,

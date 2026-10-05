@@ -21,6 +21,8 @@ public class DocumentGenerationServiceTests
     public DocumentGenerationServiceTests()
     {
         _loggerFactoryMock = new Mock<ILoggerFactory>();
+        _loggerFactoryMock.Setup(f => f.CreateLogger(It.IsAny<string>()))
+            .Returns(new Mock<ILogger>().Object);
         _reflectionServiceMock = new Mock<ISelfReflectionService>();
         _patternMinerMock = new Mock<IPatternMiner>();
         _experienceStoreMock = new Mock<IExperienceMemoryStore>();

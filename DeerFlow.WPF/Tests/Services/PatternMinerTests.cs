@@ -21,6 +21,8 @@ public class PatternMinerTests
     {
         _reflectionServiceMock = new Mock<ISelfReflectionService>();
         _loggerFactoryMock = new Mock<ILoggerFactory>();
+        _loggerFactoryMock.Setup(f => f.CreateLogger(It.IsAny<string>()))
+            .Returns(new Mock<ILogger>().Object);
         _miner = new PatternMiner(_reflectionServiceMock.Object, _loggerFactoryMock.Object);
     }
 
@@ -50,6 +52,14 @@ public class PatternMinerTests
             CreateReflection("2", "code", 0.85, new List<string> { "sandbox", "memory" }),
             CreateReflection("3", "code", 0.95, new List<string> { "sandbox", "memory" }),
             CreateReflection("4", "code", 0.88, new List<string> { "sandbox" }),
+            CreateReflection("5", "code", 0.9, new List<string> { "sandbox", "memory" }),
+            CreateReflection("6", "code", 0.86, new List<string> { "sandbox", "memory" }),
+            CreateReflection("7", "code", 0.92, new List<string> { "sandbox", "memory" }),
+            CreateReflection("8", "code", 0.87, new List<string> { "sandbox" }),
+            CreateReflection("9", "code", 0.91, new List<string> { "sandbox", "memory" }),
+            CreateReflection("10", "code", 0.84, new List<string> { "sandbox", "memory" }),
+            CreateReflection("11", "code", 0.93, new List<string> { "sandbox", "memory" }),
+            CreateReflection("12", "code", 0.89, new List<string> { "sandbox" }),
         };
 
         _reflectionServiceMock
@@ -88,15 +98,15 @@ public class PatternMinerTests
             CreatePattern("pattern-3", "网络搜索", 0.95, 20)
         };
 
+        var minedPatterns = new System.Collections.Concurrent.ConcurrentDictionary<string, PatternItem>();
         foreach (var pattern in patterns)
         {
-            typeof(PatternMiner)
-                .GetField("_minedPatterns", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
-                ?.SetValue(_miner, new System.Collections.Concurrent.ConcurrentDictionary<string, PatternItem>(new Dictionary<string, PatternItem>
-                {
-                    [pattern.Id] = pattern
-                }));
+            minedPatterns.TryAdd(pattern.Id, pattern);
         }
+
+        typeof(PatternMiner)
+            .GetField("_minedPatterns", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)
+            ?.SetValue(_miner, minedPatterns);
 
         // Act
         var result = _miner.RecommendPattern("帮我执行代码", "code");
@@ -162,7 +172,7 @@ public class PatternMinerTests
         Assert.Equal(2, stats["VerifiedPatterns"]);
         Assert.Equal(1, stats["DraftPatterns"]);
         Assert.Equal(1, stats["ArchivedPatterns"]);
-        Assert.Equal(35, stats["TotalUsageCount"]);
+        Assert.Equal(37, stats["TotalUsageCount"]);
         Assert.All(patterns, p => Assert.True((double)stats["AverageScore"] >= 0.7 && (double)stats["AverageScore"] <= 0.95));
     }
 

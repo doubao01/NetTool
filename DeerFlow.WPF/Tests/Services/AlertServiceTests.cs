@@ -15,6 +15,8 @@ public class AlertServiceTests
     public AlertServiceTests()
     {
         _loggerFactoryMock = new Mock<ILoggerFactory>();
+        _loggerFactoryMock.Setup(f => f.CreateLogger(It.IsAny<string>()))
+            .Returns(new Mock<ILogger>().Object);
         _service = new AlertService(_loggerFactoryMock.Object);
     }
 

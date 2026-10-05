@@ -206,9 +206,11 @@ public class AutoEvolver : IAutoEvolver
             ["SuccessRate"] = strategies.Count > 0
                 ? (double)strategies.Count(s => s.Status == "Adopted") / strategies.Count
                 : 0,
-            ["AverageExperimentDuration"] = strategies
-                .Where(s => s.ExperimentEndDate.HasValue)
-                .Average(s => (s.ExperimentEndDate!.Value - s.ExperimentStartDate).TotalHours),
+            ["AverageExperimentDuration"] = strategies.Any(s => s.ExperimentEndDate.HasValue)
+                ? strategies
+                    .Where(s => s.ExperimentEndDate.HasValue)
+                    .Average(s => (s.ExperimentEndDate!.Value - s.ExperimentStartDate).TotalHours)
+                : 0,
             ["ActiveTargets"] = _activeConfigs.Keys.ToList()
         };
     }

@@ -348,8 +348,10 @@ public class PatternMiner : IPatternMiner
             return true;
 
         // 基于关键词的相关性
-        var keywords = pattern.Description.ToLower().Split(' ', ',', '，');
-        return keywords.Any(k => descLower.Contains(k));
+        var keywords = pattern.Description
+            .ToLower()
+            .Split(new[] { ' ', ',', '，' }, StringSplitOptions.RemoveEmptyEntries);
+        return keywords.Length > 0 && keywords.Any(k => descLower.Contains(k));
     }
 
     #endregion

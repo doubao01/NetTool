@@ -16,6 +16,8 @@ public class FeedbackServiceTests
     public FeedbackServiceTests()
     {
         _loggerFactoryMock = new Mock<ILoggerFactory>();
+        _loggerFactoryMock.Setup(f => f.CreateLogger(It.IsAny<string>()))
+            .Returns(new Mock<ILogger>().Object);
         _service = new FeedbackService(_loggerFactoryMock.Object);
     }
 
