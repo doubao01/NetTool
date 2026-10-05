@@ -26,10 +26,10 @@ public class CommandToVisibilityConverter : IValueConverter
     }
 
     /// <summary>
-    /// 不支持反向转换
+    /// 不支持反向转换，返回 Binding.DoNothing 表示不参与绑定更新
     /// </summary>
     public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
     {
-        throw new NotImplementedException();
+        return Binding.DoNothing;
     }
 }

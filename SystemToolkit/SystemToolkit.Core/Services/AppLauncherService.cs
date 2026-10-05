@@ -1,4 +1,5 @@
 namespace SystemToolkit.Core.Services;
+using SystemToolkit.Core.Models;
 
 public interface IAppLauncherService
 {

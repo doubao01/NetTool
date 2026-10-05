@@ -35,12 +35,38 @@ public interface IIMPlatformService
 }
 
 /// <summary>
+/// IM 连接持久化记录，用于序列化时对令牌字段做加密处理。
+/// </summary>
+internal sealed class IMConnectionRecord
+{
+    public string Id { get; set; } = string.Empty;
+
+    public PlatformType PlatformType { get; set; }
+
+    public string DisplayName { get; set; } = string.Empty;
+
+    public string WebhookUrl { get; set; } = string.Empty;
+
+    /// <summary>加密后的令牌密文</summary>
+    public string Token { get; set; } = string.Empty;
+
+    public bool IsEnabled { get; set; }
+
+    public ConnectionStatus ConnectionStatus { get; set; }
+
+    public DateTime? LastActiveTime { get; set; }
+
+    public int TotalMessagesProcessed { get; set; }
+}
+
+/// <summary>
 /// IM 平台服务实现，管理所有 IM 连接的生命周期、持久化和消息路由
 /// </summary>
-public class IMPlatformService : IIMPlatformService, IDisposable
+public class IMPlatformService : IIMPlatformService, IDisposable, IAsyncDisposable
 {
     private readonly IApiService _apiService;
     private readonly ILoggerService _logger;
+    private readonly ISecretStore _secretStore;
     private readonly Dictionary<string, IMConnection> _connections = new();
     private readonly Dictionary<string, IIMPlatformAdapter> _adapters = new();
     private readonly string _storagePath;
@@ -52,10 +78,11 @@ public class IMPlatformService : IIMPlatformService, IDisposable
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     };
 
-    public IMPlatformService(IApiService apiService, ILoggerService logger)
+    public IMPlatformService(IApiService apiService, ILoggerService logger, ISecretStore? secretStore = null)
     {
         _apiService = apiService;
         _logger = logger;
+        _secretStore = secretStore ?? new DpapiSecretStore();
         _storagePath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "DeerFlow.WPF",
@@ -175,7 +202,23 @@ public class IMPlatformService : IIMPlatformService, IDisposable
                 Directory.CreateDirectory(dir);
             }
 
-            var json = JsonSerializer.Serialize(_connections.Values.ToList(), _jsonOptions);
+            // 令牌等敏感字段加密后再落盘，避免明文存储
+            var persisted = _connections.Values
+                .Select(c => new IMConnectionRecord
+                {
+                    Id = c.Id,
+                    PlatformType = c.PlatformType,
+                    DisplayName = c.DisplayName,
+                    WebhookUrl = c.WebhookUrl,
+                    Token = _secretStore.Protect(c.Token),
+                    IsEnabled = c.IsEnabled,
+                    ConnectionStatus = c.ConnectionStatus,
+                    LastActiveTime = c.LastActiveTime,
+                    TotalMessagesProcessed = c.TotalMessagesProcessed
+                })
+                .ToList();
+
+            var json = JsonSerializer.Serialize(persisted, _jsonOptions);
             await File.WriteAllTextAsync(_storagePath, json);
         }
         catch (Exception ex)
@@ -277,7 +320,7 @@ public class IMPlatformService : IIMPlatformService, IDisposable
     }
 
     /// <summary>
-    /// 从磁盘加载 IM 连接配置
+    /// 从磁盘加载 IM 连接配置，读到后解密令牌字段
     /// </summary>
     private async Task<List<IMConnection>> LoadFromDiskAsync()
     {
@@ -287,7 +330,21 @@ public class IMPlatformService : IIMPlatformService, IDisposable
                 return new List<IMConnection>();
 
             var json = await File.ReadAllTextAsync(_storagePath);
-            return JsonSerializer.Deserialize<List<IMConnection>>(json, _jsonOptions) ?? new List<IMConnection>();
+            var records = JsonSerializer.Deserialize<List<IMConnectionRecord>>(json, _jsonOptions)
+                ?? new List<IMConnectionRecord>();
+
+            return records.Select(r => new IMConnection
+            {
+                Id = r.Id,
+                PlatformType = r.PlatformType,
+                DisplayName = r.DisplayName,
+                WebhookUrl = r.WebhookUrl,
+                Token = _secretStore.Unprotect(r.Token),
+                IsEnabled = r.IsEnabled,
+                ConnectionStatus = r.ConnectionStatus,
+                LastActiveTime = r.LastActiveTime,
+                TotalMessagesProcessed = r.TotalMessagesProcessed
+            }).ToList();
         }
         catch (Exception ex)
         {
@@ -299,20 +356,29 @@ public class IMPlatformService : IIMPlatformService, IDisposable
     /// <inheritdoc/>
     public void Dispose()
     {
+        DisposeAsync().AsTask().GetAwaiter().GetResult();
+    }
+
+    /// <inheritdoc/>
+    public async ValueTask DisposeAsync()
+    {
         if (_disposed) return;
         _disposed = true;
 
-        foreach (var (_, adapter) in _adapters)
+        foreach (var (id, adapter) in _adapters)
         {
             try
             {
-                adapter.DisconnectAsync().GetAwaiter().GetResult();
+                await adapter.DisconnectAsync();
                 adapter.Dispose();
             }
-            catch { }
+            catch (Exception ex)
+            {
+                _logger.Error($"释放 IM 适配器失败：{id}", ex);
+            }
         }
 
         _adapters.Clear();
-        SaveToDiskAsync().GetAwaiter().GetResult();
+        await SaveToDiskAsync();
     }
 }

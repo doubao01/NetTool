@@ -1,4 +1,5 @@
 namespace SystemToolkit.Core.Services;
+using SystemToolkit.Core.Models;
 
 using System.Text;
 using System.Text.Json;
@@ -47,8 +48,9 @@ public class DevToolService : IDevToolService
             Name = "ASP.NET Controller",
             Language = "C#",
             Description = "ASP.NET Core API Controller",
-            Template = @"[ApiController]
-[Route(\"api/[controller]\")]
+            Template = """
+[ApiController]
+[Route("api/[controller]")]
 public class {{ControllerName}}Controller : ControllerBase
 {
     private readonly ILogger<{{ControllerName}}Controller> _logger;
@@ -63,7 +65,8 @@ public class {{ControllerName}}Controller : ControllerBase
     {
         return Ok();
     }
-}",
+}
+""",
             Parameters = new List<TemplateParameter>
             {
                 new() { Name = "ControllerName", Type = "string", Description = "控制器名称" }
@@ -74,8 +77,9 @@ public class {{ControllerName}}Controller : ControllerBase
             Name = "Python Function",
             Language = "Python",
             Description = "Python function with docstring",
-            Template = @"def {{function_name}}({{params}}):
-    \"\"\"
+            Template = """"
+def {{function_name}}({{params}}):
+    """
     {{description}}
     
     Args:
@@ -83,8 +87,9 @@ public class {{ControllerName}}Controller : ControllerBase
     
     Returns:
         {{return_doc}}
-    \"\"\"
-    {{body}}",
+    """
+    {{body}}
+"""",
             Parameters = new List<TemplateParameter>
             {
                 new() { Name = "function_name", Type = "string", Description = "函数名" },
@@ -99,13 +104,13 @@ public class {{ControllerName}}Controller : ControllerBase
             Language = "JSON",
             Description = "Configuration file template",
             Template = @"{
-    "appSettings": {
-        "name": "{{app_name}}",
-        "version": "{{version}}",
-        "debug": {{debug}}
+    ""appSettings"": {
+        ""name"": ""{{app_name}}"",
+        ""version"": ""{{version}}"",
+        ""debug"": {{debug}}
     },
-    "connectionStrings": {
-        "default": "{{connection_string}}"
+    ""connectionStrings"": {
+        ""default"": ""{{connection_string}}""
     }
 }",
             Parameters = new List<TemplateParameter>
@@ -227,7 +232,7 @@ public class {{ControllerName}}Controller : ControllerBase
                     Value = match.Value
                 };
 
-                foreach (Capture group in match.Groups)
+                foreach (Group group in match.Groups)
                 {
                     if (!string.IsNullOrEmpty(group.Name) && group.Name != "0")
                     {

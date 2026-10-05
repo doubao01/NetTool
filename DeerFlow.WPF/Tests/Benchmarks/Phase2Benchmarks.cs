@@ -4,6 +4,7 @@ using DeerFlow.WPF.Models;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics;
+using System.IO;
 
 namespace DeerFlow.WPF.Tests.Benchmarks;
 

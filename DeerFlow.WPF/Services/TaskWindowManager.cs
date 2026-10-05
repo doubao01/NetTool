@@ -194,7 +194,10 @@ public class TaskWindowManager : ITaskWindowManager
                         }
                     }
                 }
-                catch { }
+                catch (Exception ex)
+                {
+                    _logger.Warn($"任务 {taskId} 资源监控采样失败: {ex.Message}");
+                }
 
                 await Task.Delay(2000);
             }

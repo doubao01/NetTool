@@ -1,5 +1,7 @@
 namespace SystemToolkit.Core.Services;
+using SystemToolkit.Core.Models;
 
+using System.Net;
 using System.Net.NetworkInformation;
 using System.Net.Sockets;
 

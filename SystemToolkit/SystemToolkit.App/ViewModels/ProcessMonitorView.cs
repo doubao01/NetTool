@@ -1,4 +1,7 @@
+using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Data;
+using SystemToolkit.Core.Services;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
@@ -31,7 +34,7 @@ public class ProcessMonitorView : UserControl
         var refreshButton = new Button 
         { 
             Content = "刷新", 
-            Padding = new Thickness(15, 5),
+            Padding = new Thickness(15, 5, 15, 5),
             Margin = new Thickness(5)
         };
         refreshButton.Click += RefreshButton_Click;
@@ -67,14 +70,14 @@ public class ProcessMonitorView : UserControl
         _dataGrid.Columns.Add(new DataGridTextColumn 
         { 
             Header = "内存 (MB)", 
-            Binding = new Binding("WorkingSet64", StringFormat="F0", Converter = new BytesToMBConverter()),
+            Binding = new Binding("WorkingSet64") { StringFormat = "F0", Converter = new BytesToMBConverter() },
             Width = new DataGridLength(100)
         });
 
         _dataGrid.Columns.Add(new DataGridTextColumn 
         { 
             Header = "CPU 时间", 
-            Binding = new Binding("TotalProcessorTime", StringFormat="hh\\:mm\\:ss"),
+            Binding = new Binding("TotalProcessorTime") { StringFormat = "hh\\:mm\\:ss" },
             Width = new DataGridLength(100)
         });
 
@@ -104,7 +107,7 @@ public class ProcessMonitorView : UserControl
 
     private DataGridTemplateColumn CreateTemplateColumn(string header, Action<object> action)
     {
-        var button = new Button { Content = "结束进程", Padding = new Thickness(8, 4) };
+        var button = new Button { Content = "结束进程", Padding = new Thickness(8, 4, 8, 4) };
         button.Click += (s, e) => 
         {
             if (button.DataContext is Core.Models.ProcessInfo process)
@@ -163,6 +166,6 @@ public class BytesToMBConverter : System.Windows.Data.IValueConverter
 
     public object ConvertBack(object value, Type targetType, object parameter, System.Globalization.CultureInfo culture)
     {
-        throw new NotImplementedException();
+        return System.Windows.Data.Binding.DoNothing;
     }
 }

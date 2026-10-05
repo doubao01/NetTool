@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using System.Threading.Tasks;
 using System.Linq;
 using System.Collections.Generic;
+using System.IO;
 
 namespace DeerFlow.WPF.Tests.Services;
 
@@ -282,7 +283,7 @@ public class DocumentGenerationServiceTests
         _experienceStoreMock.Setup(x => x.GetAllExperiences(limit: 100))
             .Returns(new List<ExperienceMemoryItem> { new ExperienceMemoryItem { Summary = "Test" } });
         
-        _reflectionServiceMock.Setup(x => x.GetReflections(limit: 200))
+        _reflectionServiceMock.Setup(x => x.GetReflections(null, 200))
             .Returns(new List<SelfReflectionItem> { new SelfReflectionItem { TaskDescription = "Test" } });
 
         // Act

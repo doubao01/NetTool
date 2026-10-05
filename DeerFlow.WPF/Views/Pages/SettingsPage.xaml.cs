@@ -41,4 +41,12 @@ public partial class SettingsPage : UserControl
                     : Visibility.Visible;
         }
     }
+
+    private void OnApiKeyPasswordChanged(object sender, RoutedEventArgs e)
+    {
+        if (DataContext is ViewModels.SettingsViewModel vm && sender is PasswordBox box)
+        {
+            vm.ApiKey = box.Password;
+        }
+    }
 }

@@ -29,6 +29,11 @@ public interface IPatternMiner
     /// 获取模式统计信息
     /// </summary>
     Dictionary<string, object> GetPatternStatistics();
+
+    /// <summary>
+    /// 获取已挖掘的模式列表
+    /// </summary>
+    IEnumerable<PatternItem> GetPatterns(int limit = 10);
 }
 
 /// <summary>
@@ -174,6 +179,21 @@ public class PatternMiner : IPatternMiner
                 .GroupBy(p => p.Category)
                 .ToDictionary(g => g.Key, g => g.Count())
         };
+    }
+
+    /// <inheritdoc/>
+    public IEnumerable<PatternItem> GetPatterns(int limit = 10)
+    {
+        if (limit <= 0)
+        {
+            return Enumerable.Empty<PatternItem>();
+        }
+
+        return _minedPatterns.Values
+            .OrderByDescending(p => p.Score)
+            .ThenByDescending(p => p.UsageCount)
+            .Take(limit)
+            .ToList();
     }
 
     #region Private Mining Methods

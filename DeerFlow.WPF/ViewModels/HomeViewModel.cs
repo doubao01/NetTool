@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using DeerFlow.WPF.Core;
 using DeerFlow.WPF.Models;
 using DeerFlow.WPF.Services;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace DeerFlow.WPF.ViewModels;
 
@@ -62,6 +63,8 @@ public class HomeViewModel : ViewModelBase
         get => _recentReflections;
         set => SetProperty(ref _recentReflections, value);
     }
+
+    public ObservableCollection<TaskModel> RecentTasks { get; } = new();
 
     public RelayCommand NewChatCommand { get; }
     public RelayCommand NewTaskCommand { get; }
@@ -149,7 +152,7 @@ public class HomeViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _logger.Warning($"刷新健康状态失败：{ex.Message}");
+            _logger.Warn($"刷新健康状态失败：{ex.Message}");
         }
     }
 
@@ -166,9 +169,5 @@ public class HomeViewModel : ViewModelBase
     private void ViewPatternDetails()
     {
         _logger.Info("查看模式详情 - 待实现对话框");
-    }
-}
-}
-        QuickStatus = $"活跃任务: {RecentTasks.Count} 个";
     }
 }

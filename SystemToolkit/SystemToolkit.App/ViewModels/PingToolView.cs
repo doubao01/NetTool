@@ -1,3 +1,4 @@
+using System.Windows;
 using System.Windows.Controls;
 
 namespace SystemToolkit.App.ViewModels;
@@ -35,7 +36,7 @@ public class PingToolView : UserControl
             Content = "开始 Ping", 
             Height = 35, 
             FontSize = 14,
-            Padding = new Thickness(20, 5),
+            Padding = new Thickness(20, 5, 20, 5),
             HorizontalAlignment = System.Windows.HorizontalAlignment.Left
         };
         _pingButton.Click += PingButton_Click;
@@ -50,7 +51,7 @@ public class PingToolView : UserControl
             Text = "结果:", 
             FontSize = 16, 
             FontWeight = System.Windows.FontWeights.Bold,
-            Margin = new Thickness(10, 5)
+            Margin = new Thickness(10, 5, 10, 5)
         };
         Grid.SetRow(resultLabel, 1);
         grid.Children.Add(resultLabel);

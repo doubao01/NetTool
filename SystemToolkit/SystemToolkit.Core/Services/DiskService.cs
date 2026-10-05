@@ -1,6 +1,9 @@
 namespace SystemToolkit.Core.Services;
+using SystemToolkit.Core.Models;
 
 using System.IO;
+using IoDirectoryInfo = System.IO.DirectoryInfo;
+using DirectoryInfo = SystemToolkit.Core.Models.DirectoryInfo;
 
 public interface IDiskService
 {
@@ -46,7 +49,7 @@ public class DiskService : IDiskService
     public async Task<List<DirectoryInfo>> AnalyzeDirectoryAsync(string path, CancellationToken ct = default)
     {
         var dirInfos = new List<DirectoryInfo>();
-        var dirInfo = new DirectoryInfo(path);
+        var dirInfo = new IoDirectoryInfo(path);
 
         if (!dirInfo.Exists)
         {
@@ -58,7 +61,7 @@ public class DiskService : IDiskService
         return dirInfos.OrderByDescending(d => d.Size).ToList();
     }
 
-    private async Task ScanDirectoryAsync(DirectoryInfo dir, List<DirectoryInfo> results, CancellationToken ct)
+    private async Task ScanDirectoryAsync(IoDirectoryInfo dir, List<DirectoryInfo> results, CancellationToken ct)
     {
         ct.ThrowIfCancellationRequested();
 
@@ -113,7 +116,7 @@ public class DiskService : IDiskService
     public async Task<List<LargeFile>> FindLargeFilesAsync(string directory, long minSizeBytes, int count = 100, CancellationToken ct = default)
     {
         var largeFiles = new List<LargeFile>();
-        var dirInfo = new DirectoryInfo(directory);
+        var dirInfo = new IoDirectoryInfo(directory);
 
         if (!dirInfo.Exists)
         {
@@ -192,7 +195,7 @@ public class DiskService : IDiskService
 
         try
         {
-            var dirInfo = new DirectoryInfo(path);
+            var dirInfo = new IoDirectoryInfo(path);
             foreach (var file in dirInfo.EnumerateFiles("*", SearchOption.AllDirectories))
             {
                 try

@@ -82,7 +82,11 @@ public class LoggerService : ILoggerService
         {
             File.AppendAllText(_logFilePath, logEntry + Environment.NewLine);
         }
-        catch { }
+        catch (Exception ex)
+        {
+            // 日志写入失败不能影响主流程，仅输出到调试通道
+            System.Diagnostics.Debug.WriteLine($"日志文件写入失败: {ex.Message}");
+        }
     }
 
     /// <summary>

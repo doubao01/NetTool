@@ -1,5 +1,9 @@
 namespace SystemToolkit.Core.Services;
+using SystemToolkit.Core.Models;
 
+using System.Drawing;
+using System.Runtime.InteropServices;
+using System.Text;
 using System.Collections.Concurrent;
 
 public interface IProductivityService
@@ -25,8 +29,8 @@ public interface IProductivityService
 public class ProductivityService : IProductivityService
 {
     private static readonly ConcurrentQueue<ClipboardHistoryItem> ClipboardHistory = new();
-    private static readonly Dictionary<string, System.Timers.Timer> ActiveTimers = new();
-    private static readonly Dictionary<string, ShortcutMapping> RegisteredShortcuts = new();
+    private static readonly ConcurrentDictionary<string, System.Timers.Timer> ActiveTimers = new();
+    private static readonly ConcurrentDictionary<string, ShortcutMapping> RegisteredShortcuts = new();
     private static readonly List<MacroRecording> SavedMacros = new();
     private static MacroRecording? CurrentRecording;
 
@@ -63,12 +67,18 @@ public class ProductivityService : IProductivityService
     {
         return Task.Run(() =>
         {
-            var screenWidth = SystemInformation.PrimaryMonitorSize.Width;
-            var screenHeight = SystemInformation.PrimaryMonitorSize.Height;
+            var screenWidth = GetSystemMetrics(SM_CXSCREEN);
+            var screenHeight = GetSystemMetrics(SM_CYSCREEN);
 
             return CaptureRegionAsync(new Rectangle(0, 0, screenWidth, screenHeight), outputPath);
         });
     }
+
+    private const int SM_CXSCREEN = 0;
+    private const int SM_CYSCREEN = 1;
+
+    [DllImport("user32.dll")]
+    private static extern int GetSystemMetrics(int nIndex);
 
     public Task<ScreenshotResult> CaptureRegionAsync(Rectangle region, string? outputPath = null)
     {

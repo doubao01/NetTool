@@ -1,0 +1,12 @@
+<Project>
+  <!--
+    仓库级共享属性，作为版本号的单一来源。
+    各子项目可覆盖，但默认继承此处的版本。
+  -->
+  <PropertyGroup>
+    <Version>1.3.0</Version>
+    <Company>NetTool Team</Company>
+    <Product>NetTool</Product>
+    <Copyright>Copyright © NetTool Team</Copyright>
+  </PropertyGroup>
+</Project>

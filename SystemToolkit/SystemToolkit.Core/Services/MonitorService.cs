@@ -1,7 +1,8 @@
 namespace SystemToolkit.Core.Services;
+using SystemToolkit.Core.Models;
 
 using System.Diagnostics;
-using System.Diagnostics.PerformanceCounter;
+using System.Net.NetworkInformation;
 
 public interface IMonitorService
 {
@@ -166,13 +167,25 @@ public class MonitorService : IMonitorService
         try
         {
             var ipv4 = IPGlobalProperties.GetIPGlobalProperties();
-            var tcpStats = ipv4.GetTcpIPv4Statistics();
-            var udpStats = ipv4.GetUdpIPv4Statistics();
+
+            long bytesSent = 0;
+            long bytesReceived = 0;
+            foreach (var ni in NetworkInterface.GetAllNetworkInterfaces())
+            {
+                if (ni.OperationalStatus != OperationalStatus.Up)
+                {
+                    continue;
+                }
+
+                var nicStats = ni.GetIPv4Statistics();
+                bytesSent += nicStats.BytesSent;
+                bytesReceived += nicStats.BytesReceived;
+            }
 
             return new NetworkMonitorInfo
             {
-                BytesSent = tcpStats.BytesSent + udpStats.BytesSent,
-                BytesReceived = tcpStats.BytesReceived + udpStats.BytesReceived,
+                BytesSent = bytesSent,
+                BytesReceived = bytesReceived,
                 BandwidthUsage = 0,
                 ActiveConnections = ipv4.GetActiveTcpConnections().Length,
                 Timestamp = DateTime.Now

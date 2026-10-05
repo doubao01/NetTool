@@ -12,7 +12,7 @@ public class ApiServiceTests
     {
         var mockHttp = new Mock<HttpMessageHandler>();
         var client = new HttpClient(mockHttp.Object);
-        var service = new ApiService(client);
+        var service = new ApiService(client, new AppOptionsProvider());
 
         var models = await service.GetAvailableModelsAsync();
 
@@ -26,7 +26,7 @@ public class ApiServiceTests
     {
         var client = new HttpClient { BaseAddress = new Uri("http://localhost:1") };
         client.Timeout = TimeSpan.FromMilliseconds(100);
-        var service = new ApiService(client);
+        var service = new ApiService(client, new AppOptionsProvider());
 
         var result = await service.HealthCheckAsync();
         Assert.False(result);

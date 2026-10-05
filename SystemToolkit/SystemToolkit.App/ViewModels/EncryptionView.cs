@@ -1,18 +1,19 @@
+using System.Windows;
 using System.Windows.Controls;
 
 namespace SystemToolkit.App.ViewModels;
 
 public class EncryptionView : UserControl
 {
-    private readonly TabControl _tabControl;
-    private readonly TextBox _inputTextBox;
-    private readonly TextBox _outputTextBox;
-    private readonly ComboBox _algorithmComboBox;
-    private readonly PasswordBox _keyPasswordBox;
-    private readonly PasswordBox _ivPasswordBox;
-    private readonly Button _encryptButton;
-    private readonly Button _decryptButton;
-    private readonly Button _calculateHashButton;
+    private TabControl _tabControl;
+    private TextBox _inputTextBox;
+    private TextBox _outputTextBox;
+    private ComboBox _algorithmComboBox;
+    private PasswordBox _keyPasswordBox;
+    private PasswordBox _ivPasswordBox;
+    private Button _encryptButton;
+    private Button _decryptButton;
+    private Button _calculateHashButton;
 
     public EncryptionView()
     {
@@ -44,7 +45,7 @@ public class EncryptionView : UserControl
         Content = grid;
     }
 
-    private UserControl CreateEncryptDecryptPanel()
+    private Grid CreateEncryptDecryptPanel()
     {
         var grid = new Grid();
         grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -99,11 +100,11 @@ public class EncryptionView : UserControl
         // 按钮
         var buttonPanel = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal, Margin = new Thickness(10) };
 
-        _encryptButton = new Button { Content = "加密", Padding = new Thickness(30, 8), Margin = new Thickness(0, 0, 10, 0) };
+        _encryptButton = new Button { Content = "加密", Padding = new Thickness(30, 8, 30, 8), Margin = new Thickness(0, 0, 10, 0) };
         _encryptButton.Click += EncryptButton_Click;
         buttonPanel.Children.Add(_encryptButton);
 
-        _decryptButton = new Button { Content = "解密", Padding = new Thickness(30, 8) };
+        _decryptButton = new Button { Content = "解密", Padding = new Thickness(30, 8, 30, 8) };
         _decryptButton.Click += DecryptButton_Click;
         buttonPanel.Children.Add(_decryptButton);
 
@@ -112,7 +113,7 @@ public class EncryptionView : UserControl
         return grid;
     }
 
-    private UserControl CreateHashPanel()
+    private Grid CreateHashPanel()
     {
         var grid = new Grid();
         grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -132,14 +133,14 @@ public class EncryptionView : UserControl
         algorithmsComboBox.SelectedIndex = 2;
         hashAlgorithmPanel.Children.Add(algorithmsComboBox);
 
-        _calculateHashButton = new Button { Content = "计算 Hash", Padding = new Thickness(20, 8) };
+        _calculateHashButton = new Button { Content = "计算 Hash", Padding = new Thickness(20, 8, 20, 8) };
         _calculateHashButton.Click += CalculateHashButton_Click;
         hashAlgorithmPanel.Children.Add(_calculateHashButton);
 
         Grid.SetRow(hashAlgorithmPanel, 0);
         grid.Children.Add(hashAlgorithmPanel);
 
-        var inputTextBlock = new TextBlock { Text = "输入文本:", Margin = new Thickness(10, 5) };
+        var inputTextBlock = new TextBlock { Text = "输入文本:", Margin = new Thickness(10, 5, 10, 5) };
         Grid.SetRow(inputTextBlock, 1);
         grid.Children.Add(inputTextBlock);
 
@@ -147,7 +148,7 @@ public class EncryptionView : UserControl
         Grid.SetRow(inputText, 2);
         grid.Children.Add(inputText);
 
-        var outputTextBlock = new TextBlock { Text = "Hash 结果:", Margin = new Thickness(10, 5) };
+        var outputTextBlock = new TextBlock { Text = "Hash 结果:", Margin = new Thickness(10, 5, 10, 5) };
         Grid.SetRow(outputTextBlock, 2);
         Grid.SetColumn(outputTextBlock, 1);
         grid.Children.Add(outputTextBlock);
@@ -159,7 +160,7 @@ public class EncryptionView : UserControl
         return grid;
     }
 
-    private UserControl CreateBase64Panel()
+    private Grid CreateBase64Panel()
     {
         var grid = new Grid();
         grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -167,13 +168,13 @@ public class EncryptionView : UserControl
         grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
 
         // 编码部分
-        var encodeButton = new Button { Content = "Base64 编码", Padding = new Thickness(20, 8), Margin = new Thickness(10) };
+        var encodeButton = new Button { Content = "Base64 编码", Padding = new Thickness(20, 8, 20, 8), Margin = new Thickness(10) };
         encodeButton.Click += EncodeButton_Click;
         Grid.SetRow(encodeButton, 0);
         grid.Children.Add(encodeButton);
 
         // 解码部分
-        var decodeButton = new Button { Content = "Base64 解码", Padding = new Thickness(20, 8), Margin = new Thickness(10) };
+        var decodeButton = new Button { Content = "Base64 解码", Padding = new Thickness(20, 8, 20, 8), Margin = new Thickness(10) };
         decodeButton.Click += DecodeButton_Click;
         Grid.SetRow(decodeButton, 1);
         grid.Children.Add(decodeButton);

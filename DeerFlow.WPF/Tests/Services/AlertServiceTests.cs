@@ -123,7 +123,7 @@ public class AlertServiceTests
 
         var byType = Assert.IsType<System.Collections.Generic.Dictionary<string, int>>(stats["ByType"]);
         Assert.Equal(2, byType["NegativeFeedback"]);
-        Assert.Single(byType["PerformanceThreshold"]);
+        Assert.Equal(1, byType["PerformanceThreshold"]);
     }
 
     [Fact]

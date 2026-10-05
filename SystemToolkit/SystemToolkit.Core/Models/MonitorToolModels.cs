@@ -54,6 +54,7 @@ public class ApplicationMonitorInfo
     public int CrashCount { get; set; }
     public bool AutoRestart { get; set; }
     public DateTime? LastCrashTime { get; set; }
+    public DateTime CreatedTime { get; set; }
 }
 
 public class MonitorAlert

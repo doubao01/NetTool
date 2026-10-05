@@ -1,4 +1,6 @@
 namespace SystemToolkit.Core.Services;
+using System.Diagnostics;
+using SystemToolkit.Core.Models;
 
 public interface IProcessService
 {
