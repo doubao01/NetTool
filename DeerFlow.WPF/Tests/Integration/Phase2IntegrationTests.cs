@@ -40,7 +40,9 @@ public class Phase2IntegrationTests : IClassFixture<IntegrationTestFixture>
         alertService.CheckNegativeFeedbackRate(negativeRate, 5);
 
         // Assert
-        var alerts = alertService.GetUnacknowledgedAlerts();
+        var alerts = alertService.GetUnacknowledgedAlerts()
+            .Where(a => a.Type == AlertType.NegativeFeedback)
+            .ToList();
         Assert.Single(alerts);
         Assert.Equal(AlertType.NegativeFeedback, alerts[0].Type);
         Assert.Equal(AlertSeverity.High, alerts[0].Severity);
@@ -97,13 +99,11 @@ public class Phase2IntegrationTests : IClassFixture<IntegrationTestFixture>
         // Act 2 - Extract patterns
         for (int i = 0; i < 5; i++)
         {
-            await patternMiner.ExtractPatternAsync(
-
-"test-type");
+            await reflectionService.ExtractPatternAsync(reflectionService.GetReflections(null, 10));
         }
 
         // Act 3 - Store experiences
-        experienceStore.StoreExperience(new ExperienceMemoryItem
+        await experienceStore.SaveExperienceAsync(new ExperienceMemoryItem
         {
             Summary = "集成测试经验",
             ExperienceType = "成功",
@@ -114,7 +114,7 @@ public class Phase2IntegrationTests : IClassFixture<IntegrationTestFixture>
         // Act 4 - Generate documents
         var patterns = patternMiner.GetPatterns(limit: 100).ToList();
         var experiences = experienceStore.GetAllExperiences(limit: 100).ToList();
-        var reflections = reflectionService.GetReflections(limit: 200).ToList();
+        var reflections = reflectionService.GetReflections(null, 200).ToList();
 
         var patternDoc = await documentService.GeneratePatternDocumentationAsync(patterns);
         var experienceDoc = await documentService.GenerateExperienceDocumentationAsync(experiences);

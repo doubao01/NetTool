@@ -78,7 +78,7 @@
                                     <TextBlock Text="{Binding TaskDescription}" FontSize="11"
                                                Foreground="{StaticResource TextMutedColor}"
                                                TextTrimming="CharacterEllipsis"
-                                               MaxLines="1"/>
+                                               TextWrapping="NoWrap"/>
                                 </StackPanel>
                                 <StackPanel Grid.Column="1" Orientation="Horizontal">
                                     <TextBlock Text="✅" FontSize="10" 

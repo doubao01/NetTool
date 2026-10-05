@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using DeerFlow.WPF.Core;
 using DeerFlow.WPF.Models;
 using DeerFlow.WPF.Services;
@@ -127,7 +128,7 @@ public class ChatViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _logger.Warning($"生成欢迎消息失败：{ex.Message}");
+            _logger.Warn($"生成欢迎消息失败：{ex.Message}");
             return null;
         }
     }
@@ -157,7 +158,7 @@ public class ChatViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _logger.Warning($"检索经验失败：{ex.Message}");
+            _logger.Warn($"检索经验失败：{ex.Message}");
             return (userInput, new List<string>());
         }
     }
@@ -240,7 +241,7 @@ public class ChatViewModel : ViewModelBase
                 }
                 catch (Exception ex)
                 {
-                    _logger.Warning($"记录反思失败：{ex.Message}");
+                    _logger.Warn($"记录反思失败：{ex.Message}");
                 }
             }
 
@@ -261,35 +262,6 @@ public class ChatViewModel : ViewModelBase
             assistantMessage.IsStreaming = false;
             stopwatch.Stop();
             _logger.Error($"发送消息失败 ({stopwatch.ElapsedMilliseconds}ms)", ex);
-        }
-        finally
-        {
-            IsSending = false;
-            _sendCts?.Dispose();
-            _sendCts = null;
-        }
-    }
-            else
-            {
-                await SendMessageViaApiAsync(userMessage.Content, assistantMessage);
-            }
-
-            assistantMessage.IsStreaming = false;
-            _logger.Info("消息回复完成");
-        }
-        catch (OperationCanceledException)
-        {
-            assistantMessage.IsStreaming = false;
-            assistantMessage.Content = string.IsNullOrEmpty(assistantMessage.Content)
-                ? "（生成已取消）"
-                : assistantMessage.Content + "\n\n（生成已取消）";
-            _logger.Info("消息生成已取消");
-        }
-        catch (Exception ex)
-        {
-            assistantMessage.Content = $"请求失败: {ex.Message}";
-            assistantMessage.IsStreaming = false;
-            _logger.Error("发送消息失败", ex);
         }
         finally
         {
@@ -362,7 +334,7 @@ public class ChatViewModel : ViewModelBase
     {
         if (_feedbackService is null || string.IsNullOrEmpty(_currentTaskId))
         {
-            _logger.Warning("反馈服务未启用或当前任务 ID 为空");
+            _logger.Warn("反馈服务未启用或当前任务 ID 为空");
             return;
         }
 
@@ -379,7 +351,7 @@ public class ChatViewModel : ViewModelBase
         }
         catch (Exception ex)
         {
-            _logger.Warning($"提交反馈失败：{ex.Message}");
+            _logger.Warn($"提交反馈失败：{ex.Message}");
         }
     }
 

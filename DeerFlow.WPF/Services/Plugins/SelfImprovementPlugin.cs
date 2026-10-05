@@ -278,7 +278,7 @@ public sealed class SelfImprovementPlugin
                 ## 自我改进系统健康状态
 
                 ### 反思系统
-                总反思数：{reflectionStats.ContainsKey("TotalReflections") ? reflectionStats["TotalReflections"] : "N/A"}
+                总反思数：{(reflectionStats.ContainsKey("TotalReflections") ? reflectionStats["TotalReflections"] : "N/A")}
 
                 ### 模式库
                 模式总数：{patternStats["TotalPatterns"]}

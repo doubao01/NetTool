@@ -27,10 +27,10 @@
                         <ComboBoxItem Content="💡 经验记忆文档" Tag="Experiences"/>
                         <ComboBoxItem Content="📝 反思总结报告" Tag="Reflections"/>
                     </ComboBox>
-                    <Button Content="🔄 生成" Style="{StaticResource PrimaryButton}"
+                    <Button x:Name="GenerateButton" Content="🔄 生成" Style="{StaticResource PrimaryButton}"
                             Padding="16,8" Margin="0,0,8,0"
                             Click="GenerateButton_Click"/>
-                    <Button Content="💾 导出" Style="{StaticResource SecondaryButton}"
+                    <Button x:Name="ExportButton" Content="💾 导出" Style="{StaticResource SecondaryButton}"
                             Padding="16,8"
                             Click="ExportButton_Click"/>
                 </StackPanel>

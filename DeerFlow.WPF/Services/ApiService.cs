@@ -26,10 +26,12 @@ public interface IApiService
 public class ApiService : IApiService
 {
     private readonly HttpClient _httpClient;
+    private readonly IAppOptionsProvider _options;
 
-    public ApiService(HttpClient httpClient)
+    public ApiService(HttpClient httpClient, IAppOptionsProvider options)
     {
         _httpClient = httpClient;
+        _options = options;
     }
 
     /// <inheritdoc/>
@@ -101,11 +103,7 @@ public class ApiService : IApiService
     /// <inheritdoc/>
     public async Task<List<string>> GetAvailableModelsAsync()
     {
-        return await Task.FromResult(new List<string>
-        {
-            "deepseek-v3", "deepseek-r1", "gpt-4o", "claude-3-sonnet",
-            "kimi-2.5", "doubao-seed-2.0-code"
-        });
+        return await Task.FromResult(new List<string>(_options.Options.AvailableModels));
     }
 
     /// <inheritdoc/>

@@ -5,9 +5,6 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
   <ItemGroup>
-    <PackageReference Include="System.Net.NetworkInformation" Version="8.0.0" />
-  </ItemGroup>
-  <ItemGroup>
     <ProjectReference Include="..\..\SystemToolkit.Core\SystemToolkit.Core.csproj" />
   </ItemGroup>
 </Project>

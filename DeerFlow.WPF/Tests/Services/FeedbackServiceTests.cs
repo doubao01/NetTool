@@ -16,6 +16,8 @@ public class FeedbackServiceTests
     public FeedbackServiceTests()
     {
         _loggerFactoryMock = new Mock<ILoggerFactory>();
+        _loggerFactoryMock.Setup(f => f.CreateLogger(It.IsAny<string>()))
+            .Returns(new Mock<ILogger>().Object);
         _service = new FeedbackService(_loggerFactoryMock.Object);
     }
 
@@ -86,12 +88,12 @@ public class FeedbackServiceTests
         var task2 = "task-2";
 
         // Act
-        _ = Task.Run(async () =>
+        Task.Run(async () =>
         {
             await _service.SubmitFeedbackAsync(task1, "Like", 5);
             await _service.SubmitFeedbackAsync(task2, "Like", 5);
             await _service.SubmitFeedbackAsync(task1, "Dislike", 2);
-        }).Result;
+        }).GetAwaiter().GetResult();
 
         var feedback = _service.GetFeedbackForTask(task1);
 
@@ -105,12 +107,12 @@ public class FeedbackServiceTests
     {
         // Arrange
         // Act
-        _ = Task.Run(async () =>
+        Task.Run(async () =>
         {
             await _service.SubmitFeedbackAsync("task-1", "Like", 5);
             await Task.Delay(10);
             await _service.SubmitFeedbackAsync("task-2", "Like", 4);
-        }).Result;
+        }).GetAwaiter().GetResult();
 
         var feedback = _service.GetAllFeedback();
 
@@ -123,12 +125,12 @@ public class FeedbackServiceTests
     public void GetFeedbackStatistics_ReturnsCorrectStats()
     {
         // Arrange
-        _ = Task.Run(async () =>
+        Task.Run(async () =>
         {
             await _service.SubmitFeedbackAsync("task-1", "Like", 5);
             await _service.SubmitFeedbackAsync("task-2", "Like", 4);
             await _service.SubmitFeedbackAsync("task-3", "Dislike", 2);
-        }).Result;
+        }).GetAwaiter().GetResult();
 
         // Act
         var stats = _service.GetFeedbackStatistics();
@@ -147,13 +149,13 @@ public class FeedbackServiceTests
     public void AnalyzeNegativeFeedback_ReturnsOnlyNegative()
     {
         // Arrange
-        _ = Task.Run(async () =>
+        Task.Run(async () =>
         {
             await _service.SubmitFeedbackAsync("task-1", "Like", 5);
             await _service.SubmitFeedbackAsync("task-2", "Dislike", 1);
             await _service.SubmitFeedbackAsync("task-3", "Like", 4);
             await _service.SubmitFeedbackAsync("task-4", "Dislike", 2);
-        }).Result;
+        }).GetAwaiter().GetResult();
 
         // Act
         var negative = _service.AnalyzeNegativeFeedback();
@@ -191,13 +193,13 @@ public class FeedbackServiceTests
     public void GetFeedbackStatistics_CalculatesSatisfactionRate()
     {
         // Arrange
-        _ = Task.Run(async () =>
+        Task.Run(async () =>
         {
             await _service.SubmitFeedbackAsync("task-1", "Like", 5);
             await _service.SubmitFeedbackAsync("task-2", "Like", 4);
             await _service.SubmitFeedbackAsync("task-3", "Dislike", 3);
             await _service.SubmitFeedbackAsync("task-4", "Dislike", 1);
-        }).Result;
+        }).GetAwaiter().GetResult();
 
         // Act
         var stats = _service.GetFeedbackStatistics();

@@ -69,7 +69,7 @@ public interface IAlertService
     /// <summary>
     /// 触发告警
     /// </summary>
-    void RaiseAlert(AlertType type, AlertSeverity severity, string title, string message,
+    string RaiseAlert(AlertType type, AlertSeverity severity, string title, string message,
         Dictionary<string, object>? context = null);
 
     /// <summary>
@@ -96,6 +96,21 @@ public interface IAlertService
     /// 清除已确认告警
     /// </summary>
     void ClearAcknowledgedAlerts();
+
+    /// <summary>
+    /// 检查负面反馈率并触发告警
+    /// </summary>
+    void CheckNegativeFeedbackRate(double negativeRate, int totalFeedbackCount);
+
+    /// <summary>
+    /// 检查响应时间并触发告警
+    /// </summary>
+    void CheckResponseTime(long responseTimeMs, string taskId);
+
+    /// <summary>
+    /// 检查实验异常并触发告警
+    /// </summary>
+    void CheckExperimentAnomaly(string experimentName, double score);
 }
 
 /// <summary>
@@ -118,7 +133,7 @@ public class AlertService : IAlertService
     }
 
     /// <inheritdoc/>
-    public void RaiseAlert(AlertType type, AlertSeverity severity, string title, string message,
+    public string RaiseAlert(AlertType type, AlertSeverity severity, string title, string message,
         Dictionary<string, object>? context = null)
     {
         var alert = new Alert
@@ -149,6 +164,8 @@ public class AlertService : IAlertService
                 _logger.LogInformation("[Alert] {Type} - {Title}: {Message}", type, title, message);
                 break;
         }
+
+        return alert.Id;
     }
 
     /// <inheritdoc/>
@@ -263,7 +280,7 @@ public class AlertService : IAlertService
                 type: AlertType.ExperimentAnomaly,
                 severity: AlertSeverity.Medium,
                 title: "实验效果异常",
-                message: $"实验 {experimentName} 评分为 {score:P1}，低于阈值 {_experimentAnomalyThreshold:P0}",
+                message: $"实验 {experimentName} 评分为 {score * 100:F1}%，低于阈值 {_experimentAnomalyThreshold * 100:F0}%",
                 context: new Dictionary<string, object>
                 {
                     ["ExperimentName"] = experimentName,

@@ -1,3 +1,4 @@
+using System.IO;
 using System.Text;
 using DeerFlow.WPF.Models;
 using Microsoft.Extensions.Logging;
@@ -271,6 +272,7 @@ public class DocumentGenerationService : IDocumentGenerationService
                 var successRate = filtered.Count > 0 ? (double)successCount / filtered.Count : 0;
                 sb.AppendLine($"- **成功任务**: {successCount} ({successRate:P1})");
                 sb.AppendLine($"- **失败任务**: {filtered.Count - successCount}");
+                sb.AppendLine($"- **成功率**: {successRate * 100:F1}%");
                 sb.AppendLine();
 
                 // 按类型统计

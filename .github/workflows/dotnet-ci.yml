@@ -1,0 +1,98 @@
+name: .NET CI/CD
+
+on:
+  push:
+    branches: [ "master", "develop" ]
+  pull_request:
+    branches: [ "master" ]
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  systemtoolkit:
+    name: SystemToolkit 构建与测试
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      name: 检出代码
+
+    - name: 安装 .NET 10 SDK
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.x'
+
+    - name: 还原依赖
+      run: dotnet restore SystemToolkit/SystemToolkit.sln
+
+    - name: 编译项目
+      run: dotnet build SystemToolkit/SystemToolkit.sln -c Release --no-restore
+
+    - name: 运行测试
+      run: dotnet test SystemToolkit/SystemToolkit.sln -c Release --no-build --verbosity normal
+
+    - name: 发布应用
+      run: |
+        dotnet publish SystemToolkit/SystemToolkit.App/SystemToolkit.App.csproj `
+          -c Release `
+          -r win-x64 `
+          --self-contained true `
+          -p:PublishSingleFile=true `
+          -p:PublishReadyToRun=true `
+          -o ./publish
+
+    - name: 上传构建产物
+      uses: actions/upload-artifact@v4
+      with:
+        name: SystemToolkit-win-x64
+        path: ./publish
+
+  deerflow:
+    name: DeerFlow.WPF 构建与测试
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v4
+      name: 检出代码
+
+    - name: 安装 .NET 10 SDK
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: '10.0.x'
+
+    - name: 还原依赖
+      run: dotnet restore DeerFlow.WPF/DeerFlow.WPF.csproj
+
+    - name: 编译项目
+      run: dotnet build DeerFlow.WPF/DeerFlow.WPF.csproj -c Release --no-restore
+
+    - name: 运行测试
+      run: dotnet test DeerFlow.WPF/Tests/DeerFlow.WPF.Tests.csproj -c Release --verbosity normal
+
+  release:
+    name: 发布 Release
+    needs: [ systemtoolkit ]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+
+    steps:
+    - name: 下载构建产物
+      uses: actions/download-artifact@v4
+      with:
+        name: SystemToolkit-win-x64
+        path: ./artifact
+
+    - name: 创建压缩包
+      run: |
+        cd ./artifact
+        zip -r ../SystemToolkit-${{ github.ref_name }}.zip *
+
+    - name: 创建 GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: SystemToolkit-${{ github.ref_name }}.zip
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

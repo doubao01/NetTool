@@ -1,4 +1,6 @@
 namespace SystemToolkit.Core.Services;
+using SystemToolkit.Core.Models;
+using DirectoryInfo = System.IO.DirectoryInfo;
 
 using System.Security.Cryptography;
 using System.Text;
@@ -171,7 +173,7 @@ public class FileService : IFileService
 
     public async Task<string> CalculateFileHashAsync(string filePath, string algorithm = "SHA256")
     {
-        using var hashAlgorithm = algorithm.ToUpperInvariant() switch
+        using System.Security.Cryptography.HashAlgorithm hashAlgorithm = algorithm.ToUpperInvariant() switch
         {
             "MD5" => MD5.Create(),
             "SHA1" => SHA1.Create(),

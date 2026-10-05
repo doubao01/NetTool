@@ -19,6 +19,8 @@ public class SelfReflectionServiceTests
     public SelfReflectionServiceTests()
     {
         _loggerFactoryMock = new Mock<ILoggerFactory>();
+        _loggerFactoryMock.Setup(f => f.CreateLogger(It.IsAny<string>()))
+            .Returns(new Mock<ILogger>().Object);
         _service = new SelfReflectionService(_loggerFactoryMock.Object);
     }
 

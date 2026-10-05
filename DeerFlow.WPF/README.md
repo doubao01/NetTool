@@ -2,10 +2,9 @@
 
 AI 桌面超级智能体 — 基于 WPF + MVVM 的智能体编排桌面应用，集成 AIO Sandbox 多窗口任务隔离和仿 Trae Solo 暗色主题 UI。
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue)
+![Version](https://img.shields.io/badge/version-1.3.0-blue)
 ![.NET](https://img.shields.io/badge/.NET-10.0-purple)
 ![WPF](https://img.shields.io/badge/WPF-MVVM-orange)
-![Tests](https://img.shields.io/badge/tests-28%2F28-brightgreen)
 ![Build](https://img.shields.io/badge/build-passing-brightgreen)
 
 ---

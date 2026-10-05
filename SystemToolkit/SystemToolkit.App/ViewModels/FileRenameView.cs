@@ -1,3 +1,5 @@
+using System.IO;
+using System.Windows;
 using System.Windows.Controls;
 
 namespace SystemToolkit.App.ViewModels;
@@ -33,7 +35,7 @@ public class FileRenameView : UserControl
         };
         dirPanel.Children.Add(_directoryTextBox);
 
-        var browseButton = new Button { Content = "浏览...", Padding = new Thickness(15, 5) };
+        var browseButton = new Button { Content = "浏览...", Padding = new Thickness(15, 5, 15, 5) };
         browseButton.Click += BrowseButton_Click;
         dirPanel.Children.Add(browseButton);
 
@@ -42,10 +44,10 @@ public class FileRenameView : UserControl
 
         // 重命名规则
         var rulePanel = new Grid { Margin = new Thickness(10) };
-        rulePanel.ColumnDefinitions.Add(new ColumnDefinition { Width = new ColumnWidth(100) });
-        rulePanel.ColumnDefinitions.Add(new ColumnDefinition { Width = new ColumnWidth(2, GridUnitType.Star) });
-        rulePanel.ColumnDefinitions.Add(new ColumnDefinition { Width = new ColumnWidth(100) });
-        rulePanel.ColumnDefinitions.Add(new ColumnDefinition { Width = new ColumnWidth(2, GridUnitType.Star) });
+        rulePanel.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) });
+        rulePanel.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(2, GridUnitType.Star) });
+        rulePanel.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) });
+        rulePanel.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(2, GridUnitType.Star) });
 
         rulePanel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         rulePanel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -55,14 +57,14 @@ public class FileRenameView : UserControl
         rulePanel.Children.Add(new TextBlock { Text = "搜索:", VerticalAlignment = System.Windows.VerticalAlignment.Center });
         Grid.SetColumn(rulePanel.Children[^1], 0);
 
-        _searchTextBox = new TextBox { Margin = new Thickness(5, 2) };
+        _searchTextBox = new TextBox { Margin = new Thickness(5, 2, 5, 2) };
         Grid.SetColumn(_searchTextBox, 1);
         rulePanel.Children.Add(_searchTextBox);
 
         rulePanel.Children.Add(new TextBlock { Text = "替换:", VerticalAlignment = System.Windows.VerticalAlignment.Center });
         Grid.SetColumn(rulePanel.Children[^1], 2);
 
-        _replaceTextBox = new TextBox { Margin = new Thickness(5, 2) };
+        _replaceTextBox = new TextBox { Margin = new Thickness(5, 2, 5, 2) };
         Grid.SetColumn(_replaceTextBox, 3);
         rulePanel.Children.Add(_replaceTextBox);
 
@@ -71,7 +73,7 @@ public class FileRenameView : UserControl
         Grid.SetRow(rulePanel.Children[^1], 1);
         Grid.SetColumn(rulePanel.Children[^1], 0);
 
-        _prefixTextBox = new TextBox { Margin = new Thickness(5, 2) };
+        _prefixTextBox = new TextBox { Margin = new Thickness(5, 2, 5, 2) };
         Grid.SetRow(_prefixTextBox, 1);
         Grid.SetColumn(_prefixTextBox, 1);
         rulePanel.Children.Add(_prefixTextBox);
@@ -80,13 +82,13 @@ public class FileRenameView : UserControl
         Grid.SetRow(rulePanel.Children[^1], 1);
         Grid.SetColumn(rulePanel.Children[^1], 2);
 
-        _suffixTextBox = new TextBox { Margin = new Thickness(5, 2) };
+        _suffixTextBox = new TextBox { Margin = new Thickness(5, 2, 5, 2) };
         Grid.SetRow(_suffixTextBox, 1);
         Grid.SetColumn(_suffixTextBox, 3);
         rulePanel.Children.Add(_suffixTextBox);
 
         // 第三行：正则选项
-        _regexCheckBox = new CheckBox { Content = "使用正则表达式", Margin = new Thickness(0, 5) };
+        _regexCheckBox = new CheckBox { Content = "使用正则表达式", Margin = new Thickness(0, 5, 0, 5) };
         Grid.SetRow(_regexCheckBox, 2);
         Grid.SetColumn(_regexCheckBox, 0);
         rulePanel.Children.Add(_regexCheckBox);
@@ -107,15 +109,15 @@ public class FileRenameView : UserControl
         // 操作按钮
         var buttonPanel = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal, Margin = new Thickness(10) };
 
-        var loadButton = new Button { Content = "加载文件", Padding = new Thickness(20, 8), Margin = new Thickness(0, 0, 10, 0) };
+        var loadButton = new Button { Content = "加载文件", Padding = new Thickness(20, 8, 20, 8), Margin = new Thickness(0, 0, 10, 0) };
         loadButton.Click += LoadButton_Click;
         buttonPanel.Children.Add(loadButton);
 
-        var previewButton = new Button { Content = "预览", Padding = new Thickness(20, 8), Margin = new Thickness(0, 0, 10, 0) };
+        var previewButton = new Button { Content = "预览", Padding = new Thickness(20, 8, 20, 8), Margin = new Thickness(0, 0, 10, 0) };
         previewButton.Click += PreviewButton_Click;
         buttonPanel.Children.Add(previewButton);
 
-        var renameButton = new Button { Content = "执行重命名", Padding = new Thickness(20, 8), Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0, 122, 204)), Foreground = System.Windows.Media.Brushes.White };
+        var renameButton = new Button { Content = "执行重命名", Padding = new Thickness(20, 8, 20, 8), Background = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0, 122, 204)), Foreground = System.Windows.Media.Brushes.White };
         renameButton.Click += RenameButton_Click;
         buttonPanel.Children.Add(renameButton);
 
@@ -125,7 +127,7 @@ public class FileRenameView : UserControl
         // 状态栏
         _statusTextBlock = new TextBlock 
         { 
-            Margin = new Thickness(10, 5), 
+            Margin = new Thickness(10, 5, 10, 5), 
             FontWeight = System.Windows.FontWeights.Bold,
             Foreground = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb(0, 122, 204))
         };

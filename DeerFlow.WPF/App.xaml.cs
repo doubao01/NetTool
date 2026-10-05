@@ -37,8 +37,12 @@ public partial class App : Application
     {
         var services = new ServiceCollection();
 
+        // 应用配置（appsettings.json + 环境变量覆盖）
+        services.AddSingleton<IAppOptionsProvider, AppOptionsProvider>();
+
         // 注册核心服务（单例）
         services.AddSingleton<ILoggerService, LoggerService>();
+        services.AddSingleton<ISecretStore, DpapiSecretStore>();
         services.AddSingleton<ISandboxManager, SandboxManager>();
         services.AddSingleton<ITaskWindowManager, TaskWindowManager>();
         services.AddSingleton<IWatchdogService, WatchdogService>();
@@ -46,17 +50,19 @@ public partial class App : Application
         services.AddSingleton<IIMPlatformService, IMPlatformService>();
         services.AddSingleton<IOpenSandboxService, OpenSandboxService>();
 
+        var appOptions = new AppOptionsProvider().Options;
+
         // 注册 Http 客户端
         services.AddHttpClient<IApiService, ApiService>(client =>
         {
-            client.BaseAddress = new Uri("http://localhost:11434/v1");
-            client.Timeout = TimeSpan.FromMinutes(5);
+            client.BaseAddress = new Uri(appOptions.DefaultApiBaseUrl);
+            client.Timeout = TimeSpan.FromMinutes(appOptions.ChatTimeoutMinutes);
         });
 
         // 注册 WebSearch HttpClient
         services.AddHttpClient("WebSearch", client =>
         {
-            client.Timeout = TimeSpan.FromSeconds(15);
+            client.Timeout = TimeSpan.FromSeconds(appOptions.WebSearchTimeoutSeconds);
         });
 
         // === Self-Improvement System ===
@@ -81,6 +87,9 @@ public partial class App : Application
 
         // 8. 注册文档生成服务
         services.AddSingleton<IDocumentGenerationService, DocumentGenerationService>();
+
+        // 9. 注册智能体循环执行器
+        services.AddSingleton<IAgentLoop, AgentLoop>();
 
         // 5. 注册自我改进插件
         services.AddTransient<SelfImprovementPlugin>();

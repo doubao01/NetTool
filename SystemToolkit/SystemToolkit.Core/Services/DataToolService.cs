@@ -1,4 +1,5 @@
 namespace SystemToolkit.Core.Services;
+using SystemToolkit.Core.Models;
 
 using System.Security.Cryptography;
 using System.Text;
@@ -18,7 +19,7 @@ public class DataToolService : IDataToolService
 {
     public HashResult CalculateHash(string input, string algorithm)
     {
-        using var hashAlgorithm = algorithm.ToUpperInvariant() switch
+        using System.Security.Cryptography.HashAlgorithm hashAlgorithm = algorithm.ToUpperInvariant() switch
         {
             "MD5" => MD5.Create(),
             "SHA1" => SHA1.Create(),

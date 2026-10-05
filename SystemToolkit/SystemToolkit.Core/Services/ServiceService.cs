@@ -1,4 +1,6 @@
 namespace SystemToolkit.Core.Services;
+using SystemToolkit.Core.Models;
+using ServiceStartMode = SystemToolkit.Core.Models.ServiceStartMode;
 
 using System.ServiceProcess;
 
@@ -123,7 +125,7 @@ public class ServiceService : IServiceService
         {
             // WMI implementation for changing start mode
             using var managementClass = new System.Management.ManagementClass("Win32_Service");
-            using var options = new System.Management.ObjectGetOptions();
+            var options = new System.Management.ObjectGetOptions();
             using var searcher = new System.Management.ManagementObjectSearcher(
                 $"SELECT * FROM Win32_Service WHERE Name = '{serviceName}'");
 

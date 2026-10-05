@@ -1,5 +1,7 @@
 namespace SystemToolkit.App.ViewModels;
 
+using System.Windows;
+using System.Windows.Controls;
 using SystemToolkit.Core.Services;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -142,7 +144,7 @@ public class MenuItemViewModel
     public string Name { get; set; } = string.Empty;
     public List<MenuItemViewModel> Children { get; set; } = new();
 
-    public Func<UserControl> ViewType { get; set; } = CreateDefaultView;
+    public Type? ViewType { get; set; }
 
     private static UserControl CreateDefaultView()
     {
@@ -162,6 +164,8 @@ public class MenuItemViewModel
 
     public UserControl CreateView()
     {
-        return ViewType();
+        return ViewType is null
+            ? CreateDefaultView()
+            : (UserControl)Activator.CreateInstance(ViewType)!;
     }
 }

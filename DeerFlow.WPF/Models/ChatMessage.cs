@@ -48,15 +48,10 @@ public class ChatMessage : INotifyPropertyChanged
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
-    /// <summary>
-    /// 是否正在流式传输
-    /// </summary>
-    public bool IsStreaming { get; set; }
-
-    /// <summary>
-    /// 关联的任务 ID
-    /// </summary>
-    public string? TaskId { get; set; }
+    private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
 
     /// <summary>
     /// 用户反馈类型（Like/Dislike）
@@ -67,5 +62,4 @@ public class ChatMessage : INotifyPropertyChanged
     /// 反馈评分（1-5）
     /// </summary>
     public int? FeedbackRating { get; set; }
-}
 }

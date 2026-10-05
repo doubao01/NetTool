@@ -25,7 +25,7 @@ public enum SandboxLanguage
 /// <summary>
 /// OpenSandbox 服务接口,提供沙箱生命周期管理、代码执行和文件操作
 /// </summary>
-public interface IOpenSandboxService : IDisposable
+public interface IOpenSandboxService : IDisposable, IAsyncDisposable
 {
     bool IsConnected { get; }
     string Status { get; }
@@ -278,17 +278,26 @@ public sealed class OpenSandboxService : IOpenSandboxService
 
     public void Dispose()
     {
+        DisposeAsync().AsTask().GetAwaiter().GetResult();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
         if (_sandbox is not null)
         {
             try
             {
-                _sandbox.KillAsync().Wait(TimeSpan.FromSeconds(5));
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+                await _sandbox.KillAsync(cts.Token);
             }
-            catch
+            catch (Exception ex)
             {
+                _logger.LogWarning(ex, "释放沙箱时出错: {Id}", _sandboxId);
             }
-
-            _sandbox = null;
+            finally
+            {
+                _sandbox = null;
+            }
         }
     }
 }

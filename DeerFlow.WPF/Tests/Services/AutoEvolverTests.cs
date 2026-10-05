@@ -19,6 +19,8 @@ public class AutoEvolverTests
     public AutoEvolverTests()
     {
         _loggerFactoryMock = new Mock<ILoggerFactory>();
+        _loggerFactoryMock.Setup(f => f.CreateLogger(It.IsAny<string>()))
+            .Returns(new Mock<ILogger>().Object);
         _evolver = new AutoEvolver(_loggerFactoryMock.Object);
     }
 
@@ -136,6 +138,9 @@ public class AutoEvolverTests
             "current",
             "candidate");
 
+        // Record positive metrics so the candidate is adopted
+        _evolver.RecordMetric(experimentId, "SuccessRate", 0.9);
+
         // Act & Assert - Should be "Experimenting" initially
         var stats1 = _evolver.GetExperimentStatistics();
         Assert.Equal(1, stats1["ExperimentingCount"]);
@@ -177,7 +182,8 @@ public class AutoEvolverTests
         var exp2 = _evolver.StartExperimentAsync("Exp2", "T2", "c1", "c2").Result;
         var exp3 = _evolver.StartExperimentAsync("Exp3", "T3", "c1", "c2").Result;
 
-        // Conclude exp1 (should be Adopted)
+        // Record positive metric for exp1 so it is adopted
+        _evolver.RecordMetric(exp1, "SuccessRate", 0.9);
         _evolver.ConcludeExperimentAsync(exp1).Wait();
 
         // Act
@@ -211,8 +217,8 @@ public class AutoEvolverTests
 
         // Assert
         Assert.Equal(2, stats["TotalExperiments"]);
-        Assert.Equal(1.0, stats["AdoptedCount"]);
-        Assert.Equal(1.0, stats["RejectedCount"]);
+        Assert.Equal(1, stats["AdoptedCount"]);
+        Assert.Equal(1, stats["RejectedCount"]);
         Assert.Equal(0.5, stats["SuccessRate"]); // 1 adopted / 2 total
     }
 }

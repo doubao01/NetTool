@@ -9,7 +9,6 @@
     <RootNamespace>DeerFlow.WPF</RootNamespace>
     <AssemblyName>DeerFlow.WPF</AssemblyName>
     <StartupObject>DeerFlow.WPF.App</StartupObject>
-    <Version>1.0.0</Version>
     <Authors>DeerFlow.WPF Team</Authors>
     <Description>AI桌面超级智能体 - 基于WPF的智能体编排桌面应用</Description>
     <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
@@ -28,16 +27,25 @@
     <PackageReference Include="Serilog.Sinks.File" Version="5.0.0" />
     <PackageReference Include="Serilog.Sinks.Debug" Version="2.0.0" />
     <PackageReference Include="Microsoft.Data.Sqlite" Version="8.0.0" />
-    <PackageReference Include="xunit" Version="2.7.0" />
-    <PackageReference Include="Moq" Version="4.20.70" />
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.9.0" />
-    <PackageReference Include="xunit.runner.visualstudio" Version="2.5.7" />
   </ItemGroup>
 
   <!-- 确保只有 App.xaml 作为 ApplicationDefinition -->
   <ItemGroup>
     <ApplicationDefinition Remove="**/*.xaml" />
     <ApplicationDefinition Include="App.xaml" />
+  </ItemGroup>
+
+  <!-- 测试项目独立编译，不纳入主程序 -->
+  <ItemGroup>
+    <Compile Remove="Tests/**" />
+    <None Include="Tests/**" />
+  </ItemGroup>
+
+  <!-- 应用配置文件随输出复制 -->
+  <ItemGroup>
+    <None Update="appsettings.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
   </ItemGroup>
 
 </Project>

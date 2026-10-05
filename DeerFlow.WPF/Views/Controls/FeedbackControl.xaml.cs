@@ -11,12 +11,7 @@ public partial class FeedbackControl : UserControl
     public FeedbackControl()
     {
         InitializeComponent();
-    }
-
-    protected override void OnDataContextChanged(DependencyPropertyChangedEventArgs e)
-    {
-        base.OnDataContextChanged(e);
-        _viewModel = DataContext as ChatViewModel;
+        DataContextChanged += (_, _) => _viewModel = DataContext as ChatViewModel;
     }
 
     private void LikeButton_Click(object sender, RoutedEventArgs e)

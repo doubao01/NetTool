@@ -17,13 +17,11 @@ public partial class PatternGraphControl : UserControl
     public PatternGraphControl()
     {
         InitializeComponent();
-    }
-
-    protected override void OnDataContextChanged(DependencyPropertyChangedEventArgs e)
-    {
-        base.OnDataContextChanged(e);
-        _viewModel = DataContext as HomeViewModel;
-        RenderGraph();
+        DataContextChanged += (_, _) =>
+        {
+            _viewModel = DataContext as HomeViewModel;
+            RenderGraph();
+        };
     }
 
     private void RenderGraph()
