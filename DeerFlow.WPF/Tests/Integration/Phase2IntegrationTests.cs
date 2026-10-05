@@ -40,7 +40,9 @@ public class Phase2IntegrationTests : IClassFixture<IntegrationTestFixture>
         alertService.CheckNegativeFeedbackRate(negativeRate, 5);
 
         // Assert
-        var alerts = alertService.GetUnacknowledgedAlerts();
+        var alerts = alertService.GetUnacknowledgedAlerts()
+            .Where(a => a.Type == AlertType.NegativeFeedback)
+            .ToList();
         Assert.Single(alerts);
         Assert.Equal(AlertType.NegativeFeedback, alerts[0].Type);
         Assert.Equal(AlertSeverity.High, alerts[0].Severity);

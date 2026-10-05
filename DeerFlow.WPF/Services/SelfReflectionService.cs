@@ -205,6 +205,7 @@ public class SelfReflectionService : ISelfReflectionService
         else
         {
             reflection.Challenges.Add("任务执行失败，需要分析原因");
+            reflection.Improvements.Add("分析失败原因并调整执行策略");
         }
     }
 
@@ -272,10 +273,18 @@ public class SelfReflectionService : ISelfReflectionService
                 SourceReflectionIds = reflectionList.Select(r => r.TaskId).ToList(),
                 Score = reflectionList.Average(r => r.SuccessRate),
                 UsageCount = 0,
-                SuccessCount = reflectionList.Count(r => r.SuccessRate >= 0.8),
+                SuccessCount = 0,
                 CreatedAt = DateTime.Now,
                 Status = "Verified"
             };
+
+            // 提取出的模式入库，供 GetPatterns / RecordPatternUsage 使用
+            if (_patterns.TryAdd(pattern.Id, pattern))
+            {
+                _logger.LogInformation(
+                    "[SelfReflection] 模式已入库：{PatternName} (评分：{Score})",
+                    pattern.Name, pattern.Score);
+            }
 
             return pattern;
         }

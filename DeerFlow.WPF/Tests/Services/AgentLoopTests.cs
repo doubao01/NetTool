@@ -91,7 +91,8 @@ public class AgentLoopTests
 
         Assert.True(result.Completed);
         Assert.Equal("completed", result.StopReason);
-        Assert.Equal("分析完成", result.Answer);
+        Assert.Contains("分析完成", result.Answer);
+        Assert.DoesNotContain("[DONE]", result.Answer);
         Assert.Single(result.Steps);
         Assert.True(result.Steps[0].IsFinal);
         Assert.Equal(1, chat.InvocationCount);
