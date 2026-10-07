@@ -346,7 +346,7 @@ public class AgentLoopTests
     [Fact]
     public async Task SummarizeResultsAsync_LlmFailure_ReturnsLocalSummary()
     {
-        var chat = new ScriptedChatCompletionService(new[] { "[DONE] ok" });
+        var chat = new ThrowingChatCompletionService();
         var loop = new AgentLoop(_logger, BuildKernel(chat));
         var results = new List<AgentLoopResult>
         {
@@ -415,6 +415,32 @@ public class AgentLoopTests
 
         // 前面轮次的工具失败会作为观察写回转录，最终轮次模型能看到失败上下文
         Assert.True(result.Steps.Count >= 1);
+    }
+
+    /// <summary>
+    /// 每次调用都抛异常的假聊天服务，用于验证 LLM 失败回退路径
+    /// </summary>
+    public sealed class ThrowingChatCompletionService : IChatCompletionService
+    {
+        public IReadOnlyDictionary<string, object?> Attributes { get; } =
+            new Dictionary<string, object?>();
+
+        public Task<IReadOnlyList<ChatMessageContent>> GetChatMessageContentsAsync(
+            ChatHistory chatHistory,
+            PromptExecutionSettings? executionSettings = null,
+            Kernel? kernel = null,
+            CancellationToken cancellationToken = default)
+            => throw new InvalidOperationException("LLM 不可用");
+
+        public async IAsyncEnumerable<StreamingChatMessageContent> GetStreamingChatMessageContentsAsync(
+            ChatHistory chatHistory,
+            PromptExecutionSettings? executionSettings = null,
+            Kernel? kernel = null,
+            [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        {
+            await Task.Yield();
+            yield break;
+        }
     }
 
     private sealed class MockLoggerService : ILoggerService
