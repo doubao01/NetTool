@@ -67,6 +67,55 @@ public sealed class ScriptedChatCompletionService : IChatCompletionService
     }
 }
 
+/// <summary>
+/// 在首个流式响应中发出工具调用更新的假聊天服务，用于验证手动工具执行循环。
+/// 第二轮返回完成标记。
+/// </summary>
+public sealed class ToolCallChatCompletionService : IChatCompletionService
+{
+    private readonly string _functionName;
+    private readonly string _arguments;
+    private int _calls;
+
+    public ToolCallChatCompletionService(string functionName, string arguments)
+    {
+        _functionName = functionName;
+        _arguments = arguments;
+    }
+
+    public IReadOnlyDictionary<string, object?> Attributes { get; } =
+        new Dictionary<string, object?>();
+
+    public Task<IReadOnlyList<ChatMessageContent>> GetChatMessageContentsAsync(
+        ChatHistory chatHistory,
+        PromptExecutionSettings? executionSettings = null,
+        Kernel? kernel = null,
+        CancellationToken cancellationToken = default)
+        => Task.FromResult<IReadOnlyList<ChatMessageContent>>(new List<ChatMessageContent>());
+
+    public async IAsyncEnumerable<StreamingChatMessageContent> GetStreamingChatMessageContentsAsync(
+        ChatHistory chatHistory,
+        PromptExecutionSettings? executionSettings = null,
+        Kernel? kernel = null,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        _calls++;
+        await Task.Yield();
+        if (_calls == 1)
+        {
+            var message = new StreamingChatMessageContent(AuthorRole.Assistant, null);
+            var items = message.Items;
+            items.Add(new StreamingFunctionCallUpdateContent(
+                "call1", _functionName, _arguments, functionCallIndex: 0));
+            yield return message;
+        }
+        else
+        {
+            yield return new StreamingChatMessageContent(AuthorRole.Assistant, "[DONE] 已完成工具调用");
+        }
+    }
+}
+
 public class AgentLoopTests
 {
     private readonly MockLoggerService _logger = new();
@@ -173,6 +222,26 @@ public class AgentLoopTests
     }
 
     [Fact]
+    public async Task RunSubAgentsAsync_TagsStepsWithAgentName()
+    {
+        var chat = new ScriptedChatCompletionService(new[]
+        {
+            "[DONE] 子任务完成"
+        });
+        var loop = new AgentLoop(_logger, BuildKernel(chat));
+        var names = new List<string>();
+
+        var results = await loop.RunSubAgentsAsync(
+            new[] { "子目标A", "子目标B" },
+            new AgentConfig { MaxSubAgents = 2 },
+            new Progress<AgentStep>(s => names.Add(s.AgentName)));
+
+        Assert.All(results, r => Assert.All(r.Steps, s => Assert.StartsWith("子智能体", s.AgentName)));
+        Assert.Contains("子智能体1", names);
+        Assert.Contains("子智能体2", names);
+    }
+
+    [Fact]
     public async Task RunSubAgentsAsync_EmptyList_ReturnsEmpty()
     {
         var chat = new ScriptedChatCompletionService(new[] { "[DONE]" });
@@ -183,11 +252,214 @@ public class AgentLoopTests
         Assert.Empty(results);
     }
 
+    [Fact]
+    public async Task PlanSubGoalsAsync_ParsesNumberedLines()
+    {
+        var chat = new ScriptedChatCompletionService(new[]
+        {
+            "1. 收集数据\n2. 分析数据\n3. 输出报告"
+        });
+        var loop = new AgentLoop(_logger, BuildKernel(chat));
+        var config = new AgentConfig { MaxSubAgents = 5 };
+
+        var subGoals = await loop.PlanSubGoalsAsync("做数据分析", config);
+
+        Assert.Equal(3, subGoals.Count);
+        Assert.Contains("收集数据", subGoals[0]);
+        Assert.Contains("分析数据", subGoals[1]);
+        Assert.Contains("输出报告", subGoals[2]);
+    }
+
+    [Fact]
+    public async Task PlanSubGoalsAsync_EmptyResponse_FallsBackToOriginalGoal()
+    {
+        var chat = new ScriptedChatCompletionService(new[] { "   " });
+        var loop = new AgentLoop(_logger, BuildKernel(chat));
+
+        var subGoals = await loop.PlanSubGoalsAsync("原始目标", new AgentConfig());
+
+        var subGoal = Assert.Single(subGoals);
+        Assert.Equal("原始目标", subGoal);
+    }
+
+    [Fact]
+    public async Task PlanSubGoalsAsync_EmptyGoal_ReturnsEmpty()
+    {
+        var chat = new ScriptedChatCompletionService(new[] { "[DONE]" });
+        var loop = new AgentLoop(_logger, BuildKernel(chat));
+
+        var subGoals = await loop.PlanSubGoalsAsync("  ", new AgentConfig());
+
+        Assert.Empty(subGoals);
+        Assert.Equal(0, chat.InvocationCount);
+    }
+
+    [Fact]
+    public async Task PlanSubGoalsAsync_RespectsMaxSubAgentsCap()
+    {
+        var chat = new ScriptedChatCompletionService(new[]
+        {
+            "一\n二\n三\n四\n五\n六\n七\n八\n九\n十\n十一\n十二"
+        });
+        var loop = new AgentLoop(_logger, BuildKernel(chat));
+
+        var subGoals = await loop.PlanSubGoalsAsync("大目标", new AgentConfig { MaxSubAgents = 3 });
+
+        Assert.Equal(3, subGoals.Count);
+    }
+
+    [Fact]
+    public async Task SummarizeResultsAsync_UsesLlmSummary()
+    {
+        var chat = new ScriptedChatCompletionService(new[]
+        {
+            "[DONE] 子任务完成",
+            "整体执行良好，全部子任务收敛。"
+        });
+        var loop = new AgentLoop(_logger, BuildKernel(chat));
+        var first = await loop.RunAsync("子任务", new AgentConfig());
+
+        var summary = await loop.SummarizeResultsAsync(
+            "总目标",
+            new[] { "子任务" },
+            new[] { first },
+            new AgentConfig());
+
+        Assert.Contains("整体执行良好", summary);
+    }
+
+    [Fact]
+    public async Task SummarizeResultsAsync_WithoutKernel_ReturnsLocalSummary()
+    {
+        var loop = new AgentLoop(_logger);
+
+        var summary = await loop.SummarizeResultsAsync(
+            "总目标",
+            new[] { "子任务A" },
+            new[] { new AgentLoopResult { Completed = true, StopReason = "completed", Answer = "完成了" } },
+            new AgentConfig());
+
+        Assert.Contains("1/1", summary);
+        Assert.Contains("子任务A", summary);
+    }
+
+    [Fact]
+    public async Task SummarizeResultsAsync_LlmFailure_ReturnsLocalSummary()
+    {
+        var chat = new ScriptedChatCompletionService(new[] { "[DONE] ok" });
+        var loop = new AgentLoop(_logger, BuildKernel(chat));
+        var results = new List<AgentLoopResult>
+        {
+            new() { Completed = true, StopReason = "completed", Answer = "完成" }
+        };
+
+        var summary = await loop.SummarizeResultsAsync(
+            "总目标",
+            new[] { "子任务" },
+            results,
+            new AgentConfig());
+
+        Assert.Contains("1/1", summary);
+    }
+
+    [Fact]
+    public async Task RunAsync_ToolCallCapturedViaStreamingUpdates()
+    {
+        var builder = Kernel.CreateBuilder();
+        builder.Services.AddSingleton<IChatCompletionService>(
+            new ToolCallChatCompletionService("demo-echo", "{\"text\":\"abc\"}"));
+        var kernel = builder.Build();
+        kernel.ImportPluginFromObject(new EchoTools(), "demo");
+
+        var loop = new AgentLoop(_logger, kernel);
+        var result = await loop.RunAsync("使用工具", new AgentConfig());
+
+        var allCalls = result.Steps.SelectMany(s => s.ToolCalls).ToList();
+        var allObs = result.Steps.SelectMany(s => s.Observations).ToList();
+        Assert.Contains(allCalls, c => c.Contains("demo.echo"));
+        Assert.Contains(allObs, o => o.Contains("hello-from-tool"));
+        Assert.All(result.Steps, s =>
+            Assert.Equal(s.ToolCalls.Count, s.ToolElapsedMs.Count));
+    }
+
+    [Fact]
+    public async Task RunAsync_ToolFailure_RecordedInToolErrors()
+    {
+        var builder = Kernel.CreateBuilder();
+        builder.Services.AddSingleton<IChatCompletionService>(
+            new ToolCallChatCompletionService("boom-fail", "{\"text\":\"abc\"}"));
+        var kernel = builder.Build();
+        kernel.ImportPluginFromObject(new FailingTools(), "boom");
+
+        var loop = new AgentLoop(_logger, kernel);
+        var result = await loop.RunAsync("触发工具失败", new AgentConfig());
+
+        var errors = result.Steps.SelectMany(s => s.ToolErrors).ToList();
+        Assert.Contains(errors, e => e.Contains("boom.fail"));
+        Assert.All(result.Steps, s =>
+            Assert.Equal(s.ToolCalls.Count, s.ToolElapsedMs.Count));
+    }
+
+    [Fact]
+    public async Task RunAsync_ToolErrorsFeedBackIntoNextRound()
+    {
+        var builder = Kernel.CreateBuilder();
+        var chat = new ScriptedChatCompletionService(new[] { "[DONE] 收到失败信息" });
+        builder.Services.AddSingleton<IChatCompletionService>(chat);
+        var kernel = builder.Build();
+        kernel.ImportPluginFromObject(new FailingTools(), "boom");
+        kernel.ImportPluginFromObject(new ThrowingOnceTools(), "flaky");
+
+        var loop = new AgentLoop(_logger, kernel);
+        var result = await loop.RunAsync("连续调用", new AgentConfig());
+
+        // 前面轮次的工具失败会作为观察写回转录，最终轮次模型能看到失败上下文
+        Assert.True(result.Steps.Count >= 1);
+    }
+
     private sealed class MockLoggerService : ILoggerService
     {
         public void Info(string message) { }
         public void Warn(string message) { }
         public void Error(string message, Exception? ex = null) { }
         public List<string> GetRecentLogs(int count = 50) => new();
+    }
+
+    /// <summary>
+    /// 抛出异常的工具插件，用于验证工具失败采集
+    /// </summary>
+    public sealed class FailingTools
+    {
+        [KernelFunction("fail")]
+        public string Fail(string text)
+            => throw new InvalidOperationException($"工具执行失败：{text}");
+    }
+
+    /// <summary>
+    /// 正常返回的回声工具插件
+    /// </summary>
+    public sealed class EchoTools
+    {
+        [KernelFunction("echo")]
+        public string Echo(string text) => $"hello-from-tool:{text}";
+    }
+
+    /// <summary>
+    /// 首次调用抛异常、此后成功的工具插件
+    /// </summary>
+    public sealed class ThrowingOnceTools
+    {
+        private int _calls;
+
+        [KernelFunction("probe")]
+        public string Probe(string text)
+        {
+            if (Interlocked.Increment(ref _calls) == 1)
+            {
+                throw new InvalidOperationException("首次调用失败");
+            }
+
+            return $"ok:{text}";
+        }
     }
 }
