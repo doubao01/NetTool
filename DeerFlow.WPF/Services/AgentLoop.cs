@@ -14,6 +14,9 @@ public class AgentStep
     /// <summary>步骤序号（从 1 开始）</summary>
     public int Index { get; set; }
 
+    /// <summary>产生该步骤的智能体名称（子智能体场景非空）</summary>
+    public string AgentName { get; set; } = string.Empty;
+
     /// <summary>本步骤中模型产出的文本（思考 / 回答）</summary>
     public string Thought { get; set; } = string.Empty;
 
@@ -22,6 +25,12 @@ public class AgentStep
 
     /// <summary>工具执行返回的观察结果</summary>
     public List<string> Observations { get; set; } = new();
+
+    /// <summary>工具执行失败信息（插件.函数 → 异常消息）</summary>
+    public List<string> ToolErrors { get; set; } = new();
+
+    /// <summary>每个工具调用的执行耗时（毫秒，与 ToolCalls 顺序对应）</summary>
+    public List<long> ToolElapsedMs { get; set; } = new();
 
     /// <summary>本步骤耗时（毫秒）</summary>
     public long ElapsedMs { get; set; }
@@ -80,6 +89,24 @@ public interface IAgentLoop
         AgentConfig config,
         IProgress<AgentStep>? progress = null,
         CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 由总目标让 LLM 分解出编号子目标；分解失败时返回只含原目标的列表
+    /// </summary>
+    Task<List<string>> PlanSubGoalsAsync(
+        string goal,
+        AgentConfig config,
+        CancellationToken cancellationToken = default);
+
+    /// <summary>
+    /// 由 LLM 汇总各子任务的执行结果；LLM 不可用时回退为本地拼接摘要
+    /// </summary>
+    Task<string> SummarizeResultsAsync(
+        string goal,
+        IReadOnlyList<string> subGoals,
+        IReadOnlyList<AgentLoopResult> results,
+        AgentConfig config,
+        CancellationToken cancellationToken = default);
 }
 
 /// <summary>
@@ -99,8 +126,8 @@ public class AgentLoop : IAgentLoop
     /// <summary>瞬时失败重试次数</summary>
     private const int MAX_RETRY = 2;
 
-    /// <summary>保护 Kernel 过滤器集合的并发访问锁</summary>
-    private static readonly object FilterLock = new();
+    /// <summary>任务分解允许的最大子目标数</summary>
+    private const int MaxPlanSubGoals = 10;
 
     private readonly Kernel? _kernel;
     private readonly ILoggerService _logger;
@@ -117,6 +144,18 @@ public class AgentLoop : IAgentLoop
         AgentConfig config,
         IProgress<AgentStep>? progress = null,
         CancellationToken cancellationToken = default)
+        => await RunNamedAsync(string.Empty, goal, config, progress, cancellationToken)
+            .ConfigureAwait(false);
+
+    /// <summary>
+    /// 以指定智能体名称运行循环；名称用于并发子智能体场景下区分步骤轨迹来源
+    /// </summary>
+    private async Task<AgentLoopResult> RunNamedAsync(
+        string agentName,
+        string goal,
+        AgentConfig config,
+        IProgress<AgentStep>? progress,
+        CancellationToken cancellationToken)
     {
         var result = new AgentLoopResult();
         var totalWatch = System.Diagnostics.Stopwatch.StartNew();
@@ -148,7 +187,7 @@ public class AgentLoop : IAgentLoop
 
         for (var i = 1; i <= maxIterations; i++)
         {
-            var step = new AgentStep { Index = i };
+            var step = new AgentStep { Index = i, AgentName = agentName };
             var stepWatch = System.Diagnostics.Stopwatch.StartNew();
 
             try
@@ -181,6 +220,10 @@ public class AgentLoop : IAgentLoop
                 foreach (var observation in step.Observations)
                 {
                     transcript.AppendLine($"  · 工具返回：{Truncate(observation, 2000)}");
+                }
+                foreach (var toolError in step.ToolErrors)
+                {
+                    transcript.AppendLine($"  · 工具失败：{Truncate(toolError, 500)}");
                 }
 
                 var observationFingerprint = string.Join("|", step.Observations);
@@ -259,7 +302,9 @@ public class AgentLoop : IAgentLoop
             await gate.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
-                var subResult = await RunAsync(subGoal, config, progress, cancellationToken).ConfigureAwait(false);
+                var agentName = $"子智能体{index + 1}";
+                var subResult = await RunNamedAsync(agentName, subGoal, config, progress, cancellationToken)
+                    .ConfigureAwait(false);
                 outcomes[index] = subResult;
             }
             finally
@@ -277,6 +322,163 @@ public class AgentLoop : IAgentLoop
                 Error = "子智能体未返回结果"
             }))
             .ToList();
+    }
+
+    /// <inheritdoc/>
+    public async Task<List<string>> PlanSubGoalsAsync(
+        string goal,
+        AgentConfig config,
+        CancellationToken cancellationToken = default)
+    {
+        if (string.IsNullOrWhiteSpace(goal))
+        {
+            return new List<string>();
+        }
+
+        if (_kernel is null || !_kernel.GetAllServices<IChatCompletionService>().Any())
+        {
+            _logger.Warn("任务分解未执行：Kernel/IChatCompletionService 不可用，返回原目标");
+            return new List<string> { goal.Trim() };
+        }
+
+        var maxSubAgents = Math.Clamp(config.MaxSubAgents, 1, MaxPlanSubGoals);
+        var prompt = $@"你是任务规划器。请把下面这个总目标分解为 {maxSubAgents} 个以内、可独立执行的子目标。
+要求：
+- 每行一个子目标，不要编号，不要输出任何其他内容
+- 子目标必须具体、可验证，且合在一起能覆盖总目标
+
+总目标：{goal.Trim()}";
+
+        try
+        {
+            var chat = _kernel.GetRequiredService<IChatCompletionService>();
+            var settings = new OpenAIPromptExecutionSettings
+            {
+                Temperature = 0.2,
+                MaxTokens = config.MaxTokens
+            };
+
+            var response = await chat.GetChatMessageContentsAsync(
+                new ChatHistory(prompt), settings, _kernel, cancellationToken).ConfigureAwait(false);
+            var text = response.Count > 0 ? response[^1].Content ?? string.Empty : string.Empty;
+
+            var subGoals = text
+                .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(line => line.Trim().TrimStart('-', '*', '•', ' ', '\t'))
+                .Select(line => System.Text.RegularExpressions.Regex.Replace(line, @"^\d+[.、:：]\s*", string.Empty))
+                .Where(line => line.Length > 0)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Take(maxSubAgents)
+                .ToList();
+
+            if (subGoals.Count == 0)
+            {
+                _logger.Warn("任务分解结果为空，回退为原目标");
+                return new List<string> { goal.Trim() };
+            }
+
+            _logger.Info($"任务分解完成：{goal.Trim()} → {subGoals.Count} 个子目标");
+            return subGoals;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("任务分解失败，回退为原目标", ex);
+            return new List<string> { goal.Trim() };
+        }
+    }
+
+    /// <inheritdoc/>
+    public async Task<string> SummarizeResultsAsync(
+        string goal,
+        IReadOnlyList<string> subGoals,
+        IReadOnlyList<AgentLoopResult> results,
+        AgentConfig config,
+        CancellationToken cancellationToken = default)
+    {
+        var fallback = BuildLocalSummary(goal, subGoals, results);
+
+        if (_kernel is null || !_kernel.GetAllServices<IChatCompletionService>().Any())
+        {
+            return fallback;
+        }
+
+        var builder = new System.Text.StringBuilder();
+        builder.AppendLine($"总目标：{goal.Trim()}");
+        for (var i = 0; i < subGoals.Count; i++)
+        {
+            var result = i < results.Count ? results[i] : null;
+            builder.AppendLine($"--- 子任务 {i + 1}：{subGoals[i]}");
+            builder.AppendLine($"结束原因：{result?.StopReason ?? "无结果"}");
+            builder.AppendLine($"输出：{Truncate(result?.Answer ?? string.Empty, 1500)}");
+            if (!string.IsNullOrEmpty(result?.Error))
+            {
+                builder.AppendLine($"错误：{result.Error}");
+            }
+        }
+        builder.AppendLine();
+        builder.Append("请基于以上各子任务的实际输出，用中文写一份简明的执行总结（200 字以内），指出整体完成情况与未解决事项。");
+
+        try
+        {
+            var chat = _kernel.GetRequiredService<IChatCompletionService>();
+            var settings = new OpenAIPromptExecutionSettings
+            {
+                Temperature = 0.3,
+                MaxTokens = Math.Min(config.MaxTokens, 1024)
+            };
+
+            var response = await chat.GetChatMessageContentsAsync(
+                new ChatHistory(builder.ToString()), settings, _kernel, cancellationToken).ConfigureAwait(false);
+            var summary = response.Count > 0 ? response[^1].Content?.Trim() ?? string.Empty : string.Empty;
+
+            return string.IsNullOrWhiteSpace(summary) ? fallback : summary;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("AI 汇总失败，回退为本地摘要", ex);
+            return fallback;
+        }
+    }
+
+    /// <summary>
+    /// LLM 不可用时的本地结果摘要
+    /// </summary>
+    private static string BuildLocalSummary(
+        string goal,
+        IReadOnlyList<string> subGoals,
+        IReadOnlyList<AgentLoopResult> results)
+    {
+        var builder = new System.Text.StringBuilder();
+        builder.AppendLine($"总目标：{goal.Trim()}");
+        var completed = results.Count(r => r.Completed);
+        builder.AppendLine($"完成情况：{completed}/{subGoals.Count} 个子任务成功收敛。");
+        for (var i = 0; i < subGoals.Count; i++)
+        {
+            var result = i < results.Count ? results[i] : null;
+            builder.AppendLine($"- 子任务 {i + 1} {subGoals[i]}（{result?.StopReason ?? "无结果"}）：{FirstLineOf(result?.Answer)}");
+        }
+
+        return builder.ToString().TrimEnd();
+    }
+
+    private static string FirstLineOf(string? value)
+    {
+        if (string.IsNullOrEmpty(value))
+        {
+            return string.Empty;
+        }
+
+        var idx = value.IndexOf('\n');
+        var line = idx < 0 ? value : value[..idx];
+        return Truncate(line, 120);
     }
 
     /// <summary>
@@ -319,7 +521,11 @@ public class AgentLoop : IAgentLoop
     }
 
     /// <summary>
-    /// 执行一次 Kernel 调用，自动调用工具，并通过观察过滤器采集函数调用与返回内容
+    /// 执行一次模型调用并手动执行返回的工具调用。
+    /// SK 1.52 的连接器内自动函数调用循环只在连接器自身的聊天服务中运行，
+    /// 且 IAutoFunctionInvocationFilter 无法通过运行时注册触发，因此这里改用
+    /// 官方 FunctionCallContent 手动模式：请求禁用工具选择，从流式块拼装工具调用，
+    /// 由本类直接执行并记录调用、耗时、结果与异常。
     /// </summary>
     private async Task<string> InvokeOnceAsync(
         string prompt,
@@ -329,7 +535,7 @@ public class AgentLoop : IAgentLoop
     {
         var settings = new OpenAIPromptExecutionSettings
         {
-            FunctionChoiceBehavior = FunctionChoiceBehavior.Auto(autoInvoke: true),
+            FunctionChoiceBehavior = FunctionChoiceBehavior.None(),
             Temperature = config.Temperature,
             MaxTokens = config.MaxTokens
         };
@@ -341,38 +547,91 @@ public class AgentLoop : IAgentLoop
 
         var function = _kernel!.CreateFunctionFromPrompt(
             "{{$input}}",
-            settings,
             functionName: "agent_step",
             description: "鹿流智能体单步执行");
 
-        var observer = new StepObserver(step);
         var kernel = _kernel!;
+        var text = new System.Text.StringBuilder();
+        var callBuilder = new FunctionCallContentBuilder();
 
-        // AutoFunctionInvocationFilters 是共享 Kernel 上的可变集合，登记/注销需串行化
-        lock (FilterLock)
+        await foreach (var chunk in kernel.InvokeStreamingAsync<StreamingChatMessageContent>(
+            function, arguments, cancellationToken).ConfigureAwait(false))
         {
-            kernel.AutoFunctionInvocationFilters.Add(observer);
+            text.Append(chunk.Content);
+            callBuilder.Append(chunk);
         }
 
-        try
+        var toolCalls = callBuilder.Build();
+        if (toolCalls.Count == 0)
         {
-            var text = new System.Text.StringBuilder();
-
-            await foreach (var chunk in kernel.InvokeStreamingAsync<StreamingKernelContent>(
-                function, arguments, cancellationToken).ConfigureAwait(false))
-            {
-                text.Append(chunk.ToString());
-            }
-
             return text.ToString().Trim();
         }
-        finally
+
+        // 逐个执行模型请求的工具调用，结果回灌到下一轮提示
+        var observations = new System.Text.StringBuilder();
+        foreach (var call in toolCalls)
         {
-            lock (FilterLock)
+            cancellationToken.ThrowIfCancellationRequested();
+
+            // 流式更新里工具名是模型视角的全名（连接器上报为 插件名-函数名），
+            // FunctionCallContentBuilder 不做拆分，这里按 SK 的 NameSeparator 还原插件名
+            var pluginName = call.PluginName;
+            var functionName = call.FunctionName;
+            if (string.IsNullOrEmpty(pluginName))
             {
-                kernel.AutoFunctionInvocationFilters.Remove(observer);
+                var separatorIndex = functionName.IndexOf('-');
+                if (separatorIndex > 0)
+                {
+                    pluginName = functionName[..separatorIndex];
+                    functionName = functionName[(separatorIndex + 1)..];
+                }
+            }
+
+            var resolvedCall = string.IsNullOrEmpty(pluginName)
+                ? call
+                : new FunctionCallContent(functionName, pluginName, call.Id, call.Arguments);
+
+            var toolName = $"{pluginName}.{functionName}";
+            var argsText = call.Arguments is null
+                ? string.Empty
+                : string.Join(", ", call.Arguments.Select(kv => $"{kv.Key}={kv.Value}"));
+
+            step.ToolCalls.Add(string.IsNullOrEmpty(argsText) ? toolName : $"{toolName}({argsText})");
+            var toolWatch = System.Diagnostics.Stopwatch.StartNew();
+
+            object toolResult;
+            try
+            {
+                var invocation = await resolvedCall.InvokeAsync(kernel, cancellationToken).ConfigureAwait(false);
+                toolResult = invocation.Result ?? string.Empty;
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                step.ToolErrors.Add($"{toolName}: {ex.Message}");
+                toolResult = $"工具执行失败：{ex.Message}";
+            }
+            finally
+            {
+                toolWatch.Stop();
+                step.ToolElapsedMs.Add(toolWatch.ElapsedMilliseconds);
+            }
+
+            var resultText = toolResult?.ToString() ?? string.Empty;
+            if (!string.IsNullOrWhiteSpace(resultText))
+            {
+                step.Observations.Add(resultText);
+                observations.AppendLine($"- {toolName} 返回：{resultText}");
             }
         }
+
+        var toolSection = observations.Length > 0
+            ? $"\n工具执行结果：\n{observations}"
+            : string.Empty;
+        return $"{text}{toolSection}".Trim();
     }
 
     /// <summary>
@@ -394,41 +653,5 @@ public class AgentLoop : IAgentLoop
         // 每轮预留约 30 秒，至少 2 轮、至多 20 轮
         var byTimeout = config.TimeoutMinutes * 60 / 30;
         return Math.Clamp(byTimeout, 2, 20);
-    }
-
-    /// <summary>
-    /// 自动函数调用观察者：把每次工具调用的名称、参数与返回值写入当前步骤
-    /// </summary>
-    private sealed class StepObserver : IAutoFunctionInvocationFilter
-    {
-        private readonly AgentStep _step;
-
-        public StepObserver(AgentStep step) => _step = step;
-
-        public async Task OnAutoFunctionInvocationAsync(
-            AutoFunctionInvocationContext context,
-            Func<AutoFunctionInvocationContext, Task> next)
-        {
-            var function = context.Function;
-            var name = function is null
-                ? "unknown"
-                : string.IsNullOrEmpty(function.PluginName)
-                    ? function.Name
-                    : $"{function.PluginName}.{function.Name}";
-
-            var args = context.Arguments is null
-                ? string.Empty
-                : string.Join(", ", context.Arguments.Select(kv => $"{kv.Key}={kv.Value}"));
-
-            _step.ToolCalls.Add(string.IsNullOrEmpty(args) ? name : $"{name}({args})");
-
-            await next(context).ConfigureAwait(false);
-
-            var observation = context.Result?.ToString() ?? string.Empty;
-            if (!string.IsNullOrWhiteSpace(observation))
-            {
-                _step.Observations.Add(observation);
-            }
-        }
     }
 }

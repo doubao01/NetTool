@@ -84,6 +84,7 @@ public class AgentOrchestrationViewModel : ViewModelBase
     public ObservableCollection<string> ExecutionLog { get; } = new();
 
     public RelayCommand CreateWorkflowCommand { get; }
+    public RelayCommand PlanSubGoalsCommand { get; }
     public RelayCommand StartWorkflowCommand { get; }
     public RelayCommand CancelWorkflowCommand { get; }
     public RelayCommand IncreaseMaxSubAgentsCommand { get; }
@@ -105,6 +106,7 @@ public class AgentOrchestrationViewModel : ViewModelBase
         _logger = logger;
 
         CreateWorkflowCommand = new RelayCommand(_ => CreateWorkflow());
+        PlanSubGoalsCommand = new RelayCommand(async _ => await PlanSubGoalsAsync(), _ => !IsRunning);
         StartWorkflowCommand = new RelayCommand(async _ => await StartWorkflowAsync(), _ => !IsRunning);
         CancelWorkflowCommand = new RelayCommand(_ => CancelWorkflow(), _ => IsRunning);
         IncreaseMaxSubAgentsCommand = new RelayCommand(_ =>
@@ -138,6 +140,53 @@ public class AgentOrchestrationViewModel : ViewModelBase
 
         StatusText = $"工作流就绪：{WorkflowName}，共 {steps.Count} 步";
         _logger.Info($"创建编排: {WorkflowName}（{steps.Count} 步）");
+    }
+
+    /// <summary>
+    /// 用 AI 把总体目标分解为编排步骤，写入步骤文本框
+    /// </summary>
+    private async Task PlanSubGoalsAsync()
+    {
+        if (string.IsNullOrWhiteSpace(Goal))
+        {
+            StatusText = "请先填写总体目标，再进行 AI 分解";
+            return;
+        }
+
+        IsRunning = true;
+        StatusText = "AI 分解中...";
+        ExecutionLog.Clear();
+        _logger.Info($"AI 分解编排目标: {Goal}");
+
+        try
+        {
+            _runCts?.Dispose();
+            _runCts = new CancellationTokenSource();
+
+            var config = BuildConfig();
+            var subGoals = await _agentLoop.PlanSubGoalsAsync(Goal, config, _runCts.Token);
+
+            WorkflowSteps = string.Join(Environment.NewLine, subGoals);
+            WorkflowName = string.IsNullOrWhiteSpace(WorkflowName)
+                ? $"工作流-{DateTime.Now:HHmmss}"
+                : WorkflowName;
+
+            StatusText = $"AI 分解完成：生成 {subGoals.Count} 个步骤";
+            _logger.Info($"AI 分解完成: {subGoals.Count} 个步骤");
+        }
+        catch (OperationCanceledException)
+        {
+            StatusText = "已取消";
+        }
+        catch (Exception ex)
+        {
+            StatusText = $"AI 分解失败：{ex.Message}";
+            _logger.Error("AI 分解编排目标失败", ex);
+        }
+        finally
+        {
+            IsRunning = false;
+        }
     }
 
     /// <summary>
@@ -187,6 +236,7 @@ public class AgentOrchestrationViewModel : ViewModelBase
             }
 
             WriteSummary(goals, results);
+            await AppendAiSummaryAsync(goals, results, config, _runCts.Token);
 
             var completed = results.Count(r => r.Completed);
             StatusText = $"完成：{completed}/{results.Count} 步成功收敛";
@@ -207,6 +257,30 @@ public class AgentOrchestrationViewModel : ViewModelBase
             IsRunning = false;
             _runCts?.Dispose();
             _runCts = null;
+        }
+    }
+
+    /// <summary>
+    /// 在本地汇总之后追加 AI 生成的执行总结
+    /// </summary>
+    private async Task AppendAiSummaryAsync(
+        List<string> goals,
+        List<AgentLoopResult> results,
+        AgentConfig config,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            var summary = await _agentLoop.SummarizeResultsAsync(Goal, goals, results, config, cancellationToken);
+            ResultText = $"{ResultText}{Environment.NewLine}## AI 总结{Environment.NewLine}{summary}{Environment.NewLine}";
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("AI 汇总失败，仅保留本地汇总", ex);
         }
     }
 
@@ -285,9 +359,13 @@ public class AgentOrchestrationViewModel : ViewModelBase
     /// </summary>
     private static string FormatStep(AgentStep step)
     {
+        var agent = string.IsNullOrEmpty(step.AgentName)
+            ? string.Empty
+            : $"[{step.AgentName}] ";
         var tools = step.ToolCalls.Count > 0 ? string.Join(", ", step.ToolCalls) : "无";
+        var errors = step.ToolErrors.Count > 0 ? $"（工具失败 {step.ToolErrors.Count}）" : string.Empty;
         var mark = step.IsFinal ? " [完成]" : string.Empty;
-        return $"#{step.Index} ({step.ElapsedMs}ms) 工具: {tools}{mark}";
+        return $"{agent}#{step.Index} ({step.ElapsedMs}ms) 工具: {tools}{errors}{mark}";
     }
 
     /// <summary>
@@ -305,6 +383,10 @@ public class AgentOrchestrationViewModel : ViewModelBase
             builder.AppendLine($"- 结束原因: {result?.StopReason ?? "无结果"}");
             builder.AppendLine($"- 耗时: {result?.TotalElapsedMs ?? 0}ms");
             builder.AppendLine($"- 输出: {result?.Answer ?? string.Empty}");
+            if (result is not null)
+            {
+                builder.AppendLine($"- 工具调用: {result.Steps.Sum(s => s.ToolCalls.Count)} 次，失败 {result.Steps.Sum(s => s.ToolErrors.Count)} 次");
+            }
             if (!string.IsNullOrEmpty(result?.Error))
             {
                 builder.AppendLine($"- 错误: {result.Error}");
