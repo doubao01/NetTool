@@ -129,7 +129,7 @@
                     </Grid>
                 </Border>
 
-                <!-- 中间件链配置卡片 -->
+                <!-- 执行历史卡片 -->
                 <Border Grid.Column="2" Grid.Row="0"
                         Background="{StaticResource CardBackground}"
                         CornerRadius="12" Padding="28" Margin="12,0,0,0">
@@ -138,58 +138,42 @@
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
 
-                        <TextBlock Grid.Row="0" Text="中间件链配置" FontSize="20" FontWeight="Bold"
+                        <TextBlock Grid.Row="0" Text="执行历史" FontSize="20" FontWeight="Bold"
                                    Foreground="{StaticResource TextColor}" Margin="0,0,0,12"/>
 
-                        <TextBlock Grid.Row="1" Text="借鉴 DeerFlow 2.0 的 17 个中间件体系"
+                        <TextBlock Grid.Row="1" Text="每次编排运行自动落库，可回看轨迹与结果"
                                    FontSize="13" Foreground="{StaticResource TextSecondaryColor}"
                                    Margin="0,0,0,20" TextWrapping="Wrap"/>
 
-                        <TextBlock Grid.Row="2" Text="已启用中间件" FontSize="12"
-                                   Foreground="{StaticResource TextMutedColor}"
-                                   Margin="0,0,0,12"/>
+                        <ListBox Grid.Row="2" ItemsSource="{Binding HistoryLog}"
+                                 SelectedItem="{Binding SelectedHistoryEntry, Mode=TwoWay}"
+                                 MaxHeight="260" MinHeight="120"
+                                 Background="Transparent"
+                                 BorderThickness="0"
+                                 VerticalContentAlignment="Top">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <TextBlock Text="{Binding}" FontSize="12"
+                                               TextWrapping="Wrap"/>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
 
-                        <WrapPanel Grid.Row="3">
-                            <Border Background="{StaticResource ContentBackground}"
-                                    BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
-                                    CornerRadius="8" Padding="12,8" Margin="0,0,8,8">
-                                <TextBlock Text="&#x1F512; 线程数据" FontSize="13"
-                                           Foreground="{StaticResource TextSecondaryColor}"/>
-                            </Border>
-                            <Border Background="{StaticResource ContentBackground}"
-                                    BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
-                                    CornerRadius="8" Padding="12,8" Margin="0,0,8,8">
-                                <TextBlock Text="&#x1F4C1; 文件上传" FontSize="13"
-                                           Foreground="{StaticResource TextSecondaryColor}"/>
-                            </Border>
-                            <Border Background="{StaticResource ContentBackground}"
-                                    BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
-                                    CornerRadius="8" Padding="12,8" Margin="0,0,8,8">
-                                <TextBlock Text="&#x1F6E1; 工具护栏" FontSize="13"
-                                           Foreground="{StaticResource TextSecondaryColor}"/>
-                            </Border>
-                            <Border Background="{StaticResource ContentBackground}"
-                                    BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
-                                    CornerRadius="8" Padding="12,8" Margin="0,0,8,8">
-                                <TextBlock Text="&#x1F9E0; 记忆集成" FontSize="13"
-                                           Foreground="{StaticResource TextSecondaryColor}"/>
-                            </Border>
-                            <Border Background="{StaticResource ContentBackground}"
-                                    BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
-                                    CornerRadius="8" Padding="12,8" Margin="0,0,8,8">
-                                <TextBlock Text="&#x1F504; 循环检测" FontSize="13"
-                                           Foreground="{StaticResource TextSecondaryColor}"/>
-                            </Border>
-                            <Border Background="{StaticResource ContentBackground}"
-                                    BorderBrush="{StaticResource BorderColor}" BorderThickness="1"
-                                    CornerRadius="8" Padding="12,8" Margin="0,0,8,8">
-                                <TextBlock Text="&#x1F4DD; 标题生成" FontSize="13"
-                                           Foreground="{StaticResource TextSecondaryColor}"/>
-                            </Border>
-                        </WrapPanel>
+                        <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,12,0,0">
+                            <Button Content="加载轨迹" Style="{StaticResource SecondaryButton}"
+                                    Command="{Binding LoadSelectedHistoryCommand}"
+                                    Padding="18,8" Margin="0,0,8,0"/>
+                            <Button Content="删除记录" Style="{StaticResource SecondaryButton}"
+                                    Command="{Binding DeleteSelectedHistoryCommand}"
+                                    Padding="18,8" Margin="0,0,8,0"/>
+                            <Button Content="刷新" Style="{StaticResource SecondaryButton}"
+                                    Command="{Binding RefreshHistoryCommand}"
+                                    Padding="18,8"/>
+                        </StackPanel>
                     </Grid>
                 </Border>
 

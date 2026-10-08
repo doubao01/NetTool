@@ -16,6 +16,7 @@ public class AgentOrchestrationViewModel : ViewModelBase
     private readonly ITaskWindowManager _taskManager;
     private readonly IAgentLoop _agentLoop;
     private readonly ILoggerService _logger;
+    private readonly ExecutionHistoryStore? _historyStore;
 
     private CancellationTokenSource? _runCts;
 
@@ -83,12 +84,36 @@ public class AgentOrchestrationViewModel : ViewModelBase
     /// <summary>逐步执行轨迹</summary>
     public ObservableCollection<string> ExecutionLog { get; } = new();
 
+    /// <summary>历史运行记录摘要行（含记录 ID 前缀，如 #12）</summary>
+    public ObservableCollection<string> HistoryLog { get; } = new();
+
+    private long? _selectedHistoryId;
+
+    /// <summary>选中的历史行文本，用于解析记录 ID</summary>
+    private string _selectedHistoryEntry = string.Empty;
+    public string SelectedHistoryEntry
+    {
+        get => _selectedHistoryEntry;
+        set
+        {
+            if (SetProperty(ref _selectedHistoryEntry, value))
+            {
+                _selectedHistoryId = ParseHistoryId(value);
+                LoadSelectedHistoryCommand.RaiseCanExecuteChanged();
+                DeleteSelectedHistoryCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
     public RelayCommand CreateWorkflowCommand { get; }
     public RelayCommand PlanSubGoalsCommand { get; }
     public RelayCommand StartWorkflowCommand { get; }
     public RelayCommand CancelWorkflowCommand { get; }
     public RelayCommand IncreaseMaxSubAgentsCommand { get; }
     public RelayCommand DecreaseMaxSubAgentsCommand { get; }
+    public RelayCommand RefreshHistoryCommand { get; }
+    public RelayCommand LoadSelectedHistoryCommand { get; }
+    public RelayCommand DeleteSelectedHistoryCommand { get; }
 
     /// <summary>最大子智能体数的最小值</summary>
     private const int MIN_SUB_AGENTS = 1;
@@ -99,11 +124,13 @@ public class AgentOrchestrationViewModel : ViewModelBase
     public AgentOrchestrationViewModel(
         ITaskWindowManager taskManager,
         IAgentLoop agentLoop,
-        ILoggerService logger)
+        ILoggerService logger,
+        ExecutionHistoryStore? historyStore = null)
     {
         _taskManager = taskManager;
         _agentLoop = agentLoop;
         _logger = logger;
+        _historyStore = historyStore;
 
         CreateWorkflowCommand = new RelayCommand(_ => CreateWorkflow());
         PlanSubGoalsCommand = new RelayCommand(async _ => await PlanSubGoalsAsync(), _ => !IsRunning);
@@ -119,6 +146,11 @@ public class AgentOrchestrationViewModel : ViewModelBase
             if (MaxSubAgents > MIN_SUB_AGENTS)
                 MaxSubAgents--;
         });
+        RefreshHistoryCommand = new RelayCommand(_ => RefreshHistory());
+        LoadSelectedHistoryCommand = new RelayCommand(_ => LoadSelectedHistory(), _ => _selectedHistoryId.HasValue);
+        DeleteSelectedHistoryCommand = new RelayCommand(_ => DeleteSelectedHistory(), _ => _selectedHistoryId.HasValue);
+
+        RefreshHistory();
     }
 
     /// <summary>
@@ -209,9 +241,12 @@ public class AgentOrchestrationViewModel : ViewModelBase
         _runCts = new CancellationTokenSource();
 
         var config = BuildConfig();
+        var logLines = new List<string>();
         var progress = new Progress<AgentStep>(step =>
         {
-            ExecutionLog.Add(FormatStep(step));
+            var line = FormatStep(step);
+            ExecutionLog.Add(line);
+            logLines.Add(line);
         });
 
         StatusText = $"运行中：{WorkflowName}（{steps.Count} 步，并发 {config.MaxSubAgents}）";
@@ -221,6 +256,8 @@ public class AgentOrchestrationViewModel : ViewModelBase
         {
             var goals = BuildGoals(steps);
             List<AgentLoopResult> results;
+            var runStatus = "完成";
+            var runStartedAt = DateTime.Now;
 
             if (config.EnableSubAgents && goals.Count > 1)
             {
@@ -241,16 +278,20 @@ public class AgentOrchestrationViewModel : ViewModelBase
             var completed = results.Count(r => r.Completed);
             StatusText = $"完成：{completed}/{results.Count} 步成功收敛";
             _logger.Info($"编排工作流结束: {WorkflowName}，{completed}/{results.Count} 成功");
+
+            await SaveRunHistoryAsync(runStatus, goals, results, logLines, runStartedAt);
         }
         catch (OperationCanceledException)
         {
             StatusText = "已取消";
             _logger.Info($"编排工作流已取消: {WorkflowName}");
+            await SaveRunHistoryAsync("已取消", new List<string>(), new List<AgentLoopResult>(), logLines, DateTime.Now);
         }
         catch (Exception ex)
         {
             StatusText = $"失败：{ex.Message}";
             _logger.Error($"编排工作流失败: {WorkflowName}", ex);
+            await SaveRunHistoryAsync("失败", new List<string>(), new List<AgentLoopResult>(), logLines, DateTime.Now, ex.Message);
         }
         finally
         {
@@ -291,6 +332,180 @@ public class AgentOrchestrationViewModel : ViewModelBase
     {
         _runCts?.Cancel();
         StatusText = "正在取消...";
+    }
+
+    /// <summary>
+    /// 把本次运行落库到执行历史（存储不可用时静默降级，仅记日志）
+    /// </summary>
+    private async Task SaveRunHistoryAsync(
+        string status,
+        List<string> goals,
+        List<AgentLoopResult> results,
+        List<string> logLines,
+        DateTime startedAt,
+        string? error = null)
+    {
+        if (_historyStore is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var record = new ExecutionHistoryRecord
+            {
+                WorkflowName = string.IsNullOrWhiteSpace(WorkflowName) ? "未命名工作流" : WorkflowName,
+                Goal = Goal ?? string.Empty,
+                SubGoalsJson = System.Text.Json.JsonSerializer.Serialize(goals),
+                CompletedSteps = results.Count(r => r.Completed),
+                TotalSteps = results.Count,
+                ToolCallCount = results.Sum(r => r.Steps.Sum(s => s.ToolCalls.Count)),
+                ToolErrorCount = results.Sum(r => r.Steps.Sum(s => s.ToolErrors.Count)),
+                TotalElapsedMs = results.Sum(r => r.TotalElapsedMs),
+                ExecutionLog = string.Join(Environment.NewLine, logLines),
+                ResultSummary = BuildHistoryResultSummary(results, error),
+                Status = status,
+                CreatedAt = startedAt
+            };
+
+            await _historyStore.AddAsync(record);
+            RefreshHistory();
+            _logger.Info($"执行历史已保存: {record.WorkflowName}（{status}）");
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("保存执行历史失败", ex);
+        }
+    }
+
+    private static string BuildHistoryResultSummary(List<AgentLoopResult> results, string? error)
+    {
+        var builder = new System.Text.StringBuilder();
+        for (var i = 0; i < results.Count; i++)
+        {
+            var result = results[i];
+            builder.AppendLine($"[{i + 1}] {result.StopReason} ({result.TotalElapsedMs}ms): {result.Answer}");
+        }
+
+        if (!string.IsNullOrEmpty(error))
+        {
+            builder.AppendLine($"错误: {error}");
+        }
+
+        return builder.ToString();
+    }
+
+    /// <summary>
+    /// 从历史行文本解析记录 ID（形如 "#12 ..."）
+    /// </summary>
+    private static long? ParseHistoryId(string? entry)
+    {
+        if (string.IsNullOrWhiteSpace(entry) || entry.Length < 2 || entry[0] != '#')
+        {
+            return null;
+        }
+
+        var span = entry.AsSpan(1);
+        var end = 0;
+        while (end < span.Length && char.IsDigit(span[end]))
+        {
+            end++;
+        }
+
+        return end > 0 && long.TryParse(span[..end], out var id) ? id : null;
+    }
+
+    /// <summary>
+    /// 从存储刷新历史列表
+    /// </summary>
+    private void RefreshHistory()
+    {
+        HistoryLog.Clear();
+        _selectedHistoryId = null;
+        SelectedHistoryEntry = string.Empty;
+        LoadSelectedHistoryCommand.RaiseCanExecuteChanged();
+        DeleteSelectedHistoryCommand.RaiseCanExecuteChanged();
+
+        if (_historyStore is null)
+        {
+            return;
+        }
+
+        try
+        {
+            foreach (var record in _historyStore.GetRecent(50))
+            {
+                HistoryLog.Add(FormatHistoryEntry(record));
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.Error("读取执行历史失败", ex);
+        }
+    }
+
+    private static string FormatHistoryEntry(ExecutionHistoryRecord record)
+    {
+        return $"#{record.Id} [{record.Status}] {record.WorkflowName} " +
+               $"({record.CompletedSteps}/{record.TotalSteps} 步, 工具 {record.ToolCallCount} 次/失败 {record.ToolErrorCount}, " +
+               $"{record.TotalElapsedMs}ms, {record.CreatedAt:MM-dd HH:mm:ss})";
+    }
+
+    /// <summary>
+    /// 加载选中的历史记录到轨迹/结果区
+    /// </summary>
+    private void LoadSelectedHistory()
+    {
+        if (_historyStore is null || _selectedHistoryId is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var record = _historyStore.GetRecent(50).FirstOrDefault(r => r.Id == _selectedHistoryId.Value);
+            if (record is null)
+            {
+                StatusText = $"历史记录 #{_selectedHistoryId} 已不存在";
+                return;
+            }
+
+            ExecutionLog.Clear();
+            foreach (var line in record.ExecutionLog.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                ExecutionLog.Add(line);
+            }
+
+            ResultText = $"## 历史 #{record.Id}: {record.WorkflowName}（{record.Status}）{Environment.NewLine}{record.ResultSummary}";
+            StatusText = $"已加载历史 #{record.Id}: {record.WorkflowName}";
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"加载执行历史 #{_selectedHistoryId} 失败", ex);
+        }
+    }
+
+    /// <summary>
+    /// 删除选中的历史记录
+    /// </summary>
+    private async void DeleteSelectedHistory()
+    {
+        if (_historyStore is null || _selectedHistoryId is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await _historyStore.DeleteAsync(_selectedHistoryId.Value);
+            _logger.Info($"已删除执行历史 #{_selectedHistoryId}");
+            RefreshHistory();
+            StatusText = $"已删除历史 #{_selectedHistoryId}";
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"删除执行历史 #{_selectedHistoryId} 失败", ex);
+        }
     }
 
     /// <summary>
@@ -411,6 +626,7 @@ public class AgentOrchestrationViewModel : ViewModelBase
             _runCts?.Dispose();
             _runCts = null;
             ExecutionLog.Clear();
+            HistoryLog.Clear();
         }
 
         base.Dispose(disposing);

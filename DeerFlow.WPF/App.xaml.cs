@@ -117,6 +117,10 @@ public partial class App : Application
         services.AddSingleton<MemoryPlugin>();
         services.AddTransient<WebSearchPlugin>();
         services.AddTransient<SelfImprovementPlugin>();
+        services.AddSingleton<DiagnosticsPlugin>();
+
+        // 注册执行历史存储
+        services.AddSingleton<ExecutionHistoryStore>();
 
         // 4. 注册 Filters（可观测性拦截点）
         services.AddSingleton<IFunctionInvocationFilter, SKLoggingFilter>();
@@ -160,5 +164,8 @@ public partial class App : Application
 
         var selfImprovementPlugin = serviceProvider.GetRequiredService<SelfImprovementPlugin>();
         kernel.ImportPluginFromObject(selfImprovementPlugin, "self_improve");
+
+        var diagnosticsPlugin = serviceProvider.GetRequiredService<DiagnosticsPlugin>();
+        kernel.ImportPluginFromObject(diagnosticsPlugin, "diagnostics");
     }
 }
