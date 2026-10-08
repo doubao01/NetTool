@@ -90,8 +90,10 @@ dotnet run --project SystemToolkit.App
 - AIO Sandbox 文件系统沙箱
 
 #### 🤖 智能体编排
-- 子智能体协同工作流
-- 17 中间件链 + Harness/App 分离
+- LLM 驱动的多轮任务执行循环（AgentLoop）
+- AI 目标分解与子智能体并发执行
+- 工具调用流式捕获、失败记录与结果回灌
+- AI 执行总结与本地摘要回退
 
 #### 🧠 长期记忆
 - 事实库/用户画像/主动回忆
