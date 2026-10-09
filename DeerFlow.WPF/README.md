@@ -32,6 +32,16 @@ AI 桌面超级智能体 — 基于 WPF + MVVM 的智能体编排桌面应用，
 - **工具执行循环** - 流式捕获工具调用，手动执行并记录耗时与失败，结果回灌下一轮
 - **无进展保护** - 连续无新观察自动终止，避免空转
 - **AI 执行总结** - 运行结束后生成简明总结（LLM 不可用时回退本地摘要）
+- **执行历史持久化** - 每次运行自动落库 SQLite，编排页可回看/删除历史轨迹
+
+### 内置工具集
+| 插件 | 函数 | 能力 |
+|------|------|------|
+| sandbox | create/destroy_sandbox, list_files, execute_command | 沙箱隔离执行 |
+| memory | remember, recall, forget | 会话记忆存取 |
+| web | search_web | 联网搜索 |
+| self_improve | 反思/挖掘/推荐/实验等 8 个函数 | 自我改进 |
+| diagnostics | take_memory_snapshot, compare_memory_snapshots, force_gc_collect | 内存诊断 |
 
 ## 自我迭代系统
 
