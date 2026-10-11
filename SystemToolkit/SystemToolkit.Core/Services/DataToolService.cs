@@ -215,8 +215,8 @@ public class DataToolService : IDataToolService
         {
             TotalEntries = entries.Count,
             LevelCounts = new Dictionary<string, int>(),
-            FirstEntry = entries.FirstOrDefault()?.Timestamp,
-            LastEntry = entries.LastOrDefault()?.Timestamp,
+            FirstEntry = entries.Count == 0 ? null : entries.Min(e => e.Timestamp),
+            LastEntry = entries.Count == 0 ? null : entries.Max(e => e.Timestamp),
             Alerts = new List<LogAlert>()
         };
 
@@ -256,23 +256,13 @@ public class DataToolService : IDataToolService
     {
         var entries = new List<LogEntry>();
 
-        try
+        foreach (var line in File.ReadLines(filePath))
         {
-            var lines = File.ReadAllLines(filePath);
-
-            foreach (var line in lines)
+            var entry = ParseLogLine(line);
+            if (entry != null)
             {
-                // Try to parse common log formats
-                var entry = ParseLogLine(line);
-                if (entry != null)
-                {
-                    entries.Add(entry);
-                }
+                entries.Add(entry);
             }
-        }
-        catch (Exception)
-        {
-            // Handle file access errors
         }
 
         return entries;
@@ -283,25 +273,29 @@ public class DataToolService : IDataToolService
         // Common log format: [timestamp] [level] [source] message
         var patterns = new[]
         {
-            @"^\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\] \[(\w+)\] (?:\[([^\]]+)\])? (.+)$",
+            @"^\[(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})\] \[(\w+)\] (?:\[([^\]]+)\] )?(.+)$",
             @"^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})\.?\d* \[?(\w+)\]?(?: - \[([^\]]+)\])? - (.+)$",
             @"^(\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2}) (ERROR|WARN|INFO|DEBUG|FATAL) (.+)$"
         };
 
         foreach (var pattern in patterns)
         {
-            var match = System.Text.RegularExpressions.Regex.Match(line, pattern);
+            var match = System.Text.RegularExpressions.Regex.Match(line, pattern,
+                System.Text.RegularExpressions.RegexOptions.CultureInvariant, TimeSpan.FromSeconds(1));
             if (match.Success)
             {
-                var timestamp = DateTime.Parse(match.Groups[1].Value);
+                if (!DateTime.TryParseExact(match.Groups[1].Value,
+                    new[] { "yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd'T'HH:mm:ss", "yyyy/MM/dd HH:mm:ss" },
+                    System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var timestamp))
+                    continue;
                 var level = match.Groups[2].Value;
-                var source = match.Groups.Count > 3 ? match.Groups[3].Value : null;
+                var source = match.Groups.Count > 4 && match.Groups[3].Success ? match.Groups[3].Value : null;
                 var message = match.Groups[^1].Value;
 
                 return new LogEntry
                 {
                     Timestamp = timestamp,
-                    Level = level.ToUpper(),
+                    Level = level.ToUpperInvariant(),
                     Message = message,
                     Source = source,
                     Exception = null
@@ -309,14 +303,6 @@ public class DataToolService : IDataToolService
             }
         }
 
-        // Fallback: simple format
-        return new LogEntry
-        {
-            Timestamp = DateTime.Now,
-            Level = "INFO",
-            Message = line,
-            Source = null,
-            Exception = null
-        };
+        return null;
     }
 }

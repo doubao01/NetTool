@@ -3,18 +3,25 @@ using System.Windows.Controls;
 using System.Windows.Data;
 using SystemToolkit.Core.Services;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
 
-namespace SystemToolkit.App.ViewModels;
+namespace SystemToolkit.App.Views;
 
 public class ProcessMonitorView : UserControl
 {
     private readonly DataGrid _dataGrid;
-    private readonly ProcessService _processService;
+    private readonly IProcessService _processService;
 
-    public ProcessMonitorView()
+    public ProcessMonitorView(IProcessService processService)
     {
-        _processService = new ProcessService();
+        _processService = processService;
+        _dataGrid = new DataGrid
+        {
+            AutoGenerateColumns = false,
+            CanUserAddRows = false,
+            IsReadOnly = true,
+            Margin = new Thickness(10),
+            AlternatingRowBackground = new SolidColorBrush(Color.FromRgb(248, 248, 248))
+        };
 
         var grid = new Grid();
         grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -40,19 +47,47 @@ public class ProcessMonitorView : UserControl
         refreshButton.Click += RefreshButton_Click;
         headerPanel.Children.Add(refreshButton);
 
+        var priorityBox = new ComboBox { Width = 110, Margin = new Thickness(5), VerticalAlignment = System.Windows.VerticalAlignment.Center };
+        foreach (var name in new[] { "Idle", "BelowNormal", "Normal", "AboveNormal", "High", "Realtime" })
+        {
+            priorityBox.Items.Add(name);
+        }
+        priorityBox.SelectedIndex = 2;
+        headerPanel.Children.Add(priorityBox);
+
+        var priorityButton = new Button
+        {
+            Content = "设置优先级",
+            Padding = new Thickness(15, 5, 15, 5),
+            Margin = new Thickness(5)
+        };
+        priorityButton.Click += (_, _) =>
+        {
+            if (_dataGrid.SelectedItem is not Core.Models.ProcessInfo process)
+            {
+                MessageBox.Show("请先选择进程", "提示");
+                return;
+            }
+
+            var level = (System.Diagnostics.ProcessPriorityClass)Enum.Parse(
+                typeof(System.Diagnostics.ProcessPriorityClass), (string)priorityBox.SelectedItem);
+
+            try
+            {
+                _processService.SetProcessPriority(process.Id, level);
+                RefreshProcessList();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"无法设置优先级：{ex.Message}", "错误");
+            }
+        };
+        headerPanel.Children.Add(priorityButton);
+
         Grid.SetRow(headerPanel, 0);
         grid.Children.Add(headerPanel);
 
         // 进程列表
-        _dataGrid = new DataGrid
-        {
-            AutoGenerateColumns = false,
-            CanUserAddRows = false,
-            IsReadOnly = true,
-            Margin = new Thickness(10),
-            AlternatingRowBackground = new SolidColorBrush(Color.FromRgb(248, 248, 248))
-        };
-
         _dataGrid.Columns.Add(new DataGridTextColumn 
         { 
             Header = "进程名", 
@@ -95,7 +130,7 @@ public class ProcessMonitorView : UserControl
             Width = new DataGridLength(100)
         });
 
-        _dataGrid.Columns.Add(CreateTemplateColumn("操作", OnKillProcess));
+        _dataGrid.Columns.Add(CreateKillColumn());
 
         Grid.SetRow(_dataGrid, 1);
         grid.Children.Add(_dataGrid);
@@ -105,13 +140,20 @@ public class ProcessMonitorView : UserControl
         RefreshProcessList();
     }
 
-    private DataGridTemplateColumn CreateTemplateColumn(string header, Action<object> action)
+    private DataGridTemplateColumn CreateKillColumn()
     {
-        var button = new Button { Content = "结束进程", Padding = new Thickness(8, 4, 8, 4) };
-        button.Click += (s, e) => 
+        var factory = new FrameworkElementFactory(typeof(Button));
+        factory.SetValue(Button.ContentProperty, "结束进程");
+        factory.SetValue(Button.PaddingProperty, new Thickness(8, 4, 8, 4));
+        factory.AddHandler(Button.ClickEvent, new RoutedEventHandler((_, e) =>
         {
-            if (button.DataContext is Core.Models.ProcessInfo process)
+            if (e.OriginalSource is Button { DataContext: Core.Models.ProcessInfo process })
             {
+                if (MessageBox.Show($"结束进程 {process.ProcessName} ({process.Id})？", "确认", MessageBoxButton.YesNo) != MessageBoxResult.Yes)
+                {
+                    return;
+                }
+
                 try
                 {
                     _processService.KillProcess(process.Id);
@@ -119,27 +161,18 @@ public class ProcessMonitorView : UserControl
                 }
                 catch (Exception ex)
                 {
-                    MessageBox.Show($"无法结束进程：{ex.Message}", "错误", MessageBoxButton.OK, MessageBoxImage.Error);
+                    MessageBox.Show($"无法结束进程：{ex.Message}", "错误");
                 }
             }
-        };
+        }));
 
-        var template = new System.Windows.DataTemplate();
-        var frameworkElementFactory = new FrameworkElementFactory(typeof(Button));
-        frameworkElementFactory.SetValue(Button.ContentProperty, button.Content);
-        frameworkElementFactory.SetValue(Button.PaddingProperty, button.Padding);
-        frameworkElementFactory.SetValue(Button.DataContextProperty, button.DataContext);
-        template.VisualTree = frameworkElementFactory;
-
-        return new DataGridTemplateColumn 
-        { 
-            Header = header, 
-            CellTemplate = template,
+        return new DataGridTemplateColumn
+        {
+            Header = "操作",
+            CellTemplate = new DataTemplate { VisualTree = factory },
             Width = new DataGridLength(100)
         };
     }
-
-    private void OnKillProcess(object parameter) { }
 
     private void RefreshButton_Click(object sender, System.Windows.RoutedEventArgs e)
     {

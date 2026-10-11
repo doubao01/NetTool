@@ -1,6 +1,5 @@
 using System.Diagnostics;
 using System.Windows;
-using System.Windows.Controls;
 using System.Windows.Input;
 using SystemToolkit.App.ViewModels;
 
@@ -10,24 +9,19 @@ public partial class MainWindow : Window
 {
     private readonly MainViewModel _viewModel;
 
-    public MainWindow()
+    public MainWindow(MainViewModel viewModel)
     {
         InitializeComponent();
-        _viewModel = new MainViewModel();
+        _viewModel = viewModel;
         MenuTreeView.ItemsSource = _viewModel.MenuItems;
         LoadDefaultContent();
     }
 
     private void LoadDefaultContent()
     {
-        // 默认选中第一个菜单项
-        if (_viewModel.MenuItems.Count > 0)
+        if (_viewModel.MenuItems.Count > 0 && _viewModel.MenuItems[0].Children.Count > 0)
         {
-            var firstItem = _viewModel.MenuItems[0];
-            if (firstItem.Children.Count > 0)
-            {
-                MainContent.Content = firstItem.Children[0].CreateView();
-            }
+            MainContent.Content = _viewModel.CreateView(_viewModel.MenuItems[0].Children[0]);
         }
     }
 
@@ -35,13 +29,13 @@ public partial class MainWindow : Window
     {
         if (e.NewValue is MenuItemViewModel menuItem)
         {
-            MainContent.Content = menuItem.CreateView();
+            MainContent.Content = _viewModel.CreateView(menuItem);
         }
     }
 
     private void WebsiteLink_MouseDown(object sender, MouseButtonEventArgs e)
     {
-        System.Diagnostics.Process.Start(new ProcessStartInfo
+        Process.Start(new ProcessStartInfo
         {
             FileName = "https://monkeycode-ai.com/?ic=019e4e77-519b-70dc-82ea-2a833e5e93da",
             UseShellExecute = true

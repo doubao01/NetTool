@@ -127,6 +127,12 @@ def {{function_name}}({{params}}):
     {
         if (!DefaultTemplates.TryGetValue(templateName, out var template))
         {
+            template = DefaultTemplates.Values
+                .FirstOrDefault(t => string.Equals(t.Name, templateName, StringComparison.OrdinalIgnoreCase));
+        }
+
+        if (template == null)
+        {
             throw new ArgumentException($"Template '{templateName}' not found");
         }
 
@@ -252,7 +258,7 @@ def {{function_name}}({{params}}):
                 ExecutionTimeMs = stopwatch.ElapsedMilliseconds
             };
         }
-        catch (Exception ex)
+        catch (Exception)
         {
             stopwatch.Stop();
 

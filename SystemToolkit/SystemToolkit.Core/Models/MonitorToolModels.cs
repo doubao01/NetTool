@@ -53,6 +53,7 @@ public class ApplicationMonitorInfo
     public TimeSpan Uptime { get; set; }
     public int CrashCount { get; set; }
     public bool AutoRestart { get; set; }
+    public bool WasRunning { get; set; }
     public DateTime? LastCrashTime { get; set; }
     public DateTime CreatedTime { get; set; }
 }

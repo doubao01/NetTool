@@ -11,6 +11,7 @@ public interface IFileService
     Task<List<FileItem>> FindLargeFilesAsync(string directory, long minSizeBytes, CancellationToken ct = default);
     Task<List<DuplicateFile>> FindDuplicateFilesAsync(string directory, CancellationToken ct = default);
     Task BatchRenameAsync(List<FileItem> files, RenameRule rule, CancellationToken ct = default);
+    List<(string Original, string NewName)> PreviewRename(List<FileItem> files, RenameRule rule);
     Task<string> CalculateFileHashAsync(string filePath, string algorithm = "SHA256");
     Task DeleteFilesAsync(List<string> paths, CancellationToken ct = default);
 }
@@ -142,33 +143,57 @@ public class FileService : IFileService
         return await Task.FromResult(duplicates);
     }
 
+    public List<(string Original, string NewName)> PreviewRename(List<FileItem> files, RenameRule rule)
+    {
+        return files.Select(file => (file.Name, ApplyRenameRule(file.Name, rule))).ToList();
+    }
+
     public async Task BatchRenameAsync(List<FileItem> files, RenameRule rule, CancellationToken ct = default)
     {
         foreach (var file in files)
         {
             ct.ThrowIfCancellationRequested();
 
-            string newName = file.Name;
-
-            if (rule.UseRegex)
+            string newName = ApplyRenameRule(file.Name, rule);
+            if (string.Equals(newName, file.Name, StringComparison.Ordinal))
             {
-                newName = System.Text.RegularExpressions.Regex.Replace(newName, rule.SearchPattern, rule.ReplacePattern);
-            }
-            else if (!string.IsNullOrEmpty(rule.SearchPattern))
-            {
-                newName = newName.Replace(rule.SearchPattern, rule.ReplacePattern);
+                continue;
             }
 
-            newName = $"{rule.Prefix}{newName}{rule.Suffix}";
-
-            if (!string.Equals(newName, file.Name))
-            {
-                string newPath = Path.Combine(Path.GetDirectoryName(file.Path)!, newName);
-                File.Move(file.Path, newPath, true);
-            }
+            string directory = Path.GetDirectoryName(file.Path)!;
+            string newPath = Path.Combine(directory, newName);
+            File.Move(file.Path, newPath);
+            file.Path = newPath;
+            file.Name = newName;
         }
 
         await Task.CompletedTask;
+    }
+
+    internal static string ApplyRenameRule(string name, RenameRule rule)
+    {
+        string newName = name;
+        string extension = Path.GetExtension(name);
+        string stem = Path.GetFileNameWithoutExtension(name);
+
+        if (rule.UseRegex && !string.IsNullOrEmpty(rule.SearchPattern))
+        {
+            newName = System.Text.RegularExpressions.Regex.Replace(name, rule.SearchPattern, rule.ReplacePattern ?? string.Empty);
+        }
+        else if (!string.IsNullOrEmpty(rule.SearchPattern))
+        {
+            stem = stem.Replace(rule.SearchPattern, rule.ReplacePattern ?? string.Empty);
+            newName = stem + extension;
+        }
+
+        if (!string.IsNullOrEmpty(rule.Prefix) || !string.IsNullOrEmpty(rule.Suffix))
+        {
+            extension = Path.GetExtension(newName);
+            stem = Path.GetFileNameWithoutExtension(newName);
+            newName = $"{rule.Prefix}{stem}{rule.Suffix}{extension}";
+        }
+
+        return newName;
     }
 
     public async Task<string> CalculateFileHashAsync(string filePath, string algorithm = "SHA256")

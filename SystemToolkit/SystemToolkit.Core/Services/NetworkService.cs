@@ -164,7 +164,7 @@ public class NetworkService : INetworkService
                     break;
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
                 hops.Add(new TracertHop
                 {
@@ -264,19 +264,22 @@ public class NetworkService : INetworkService
 
         try
         {
+            var pidMap = BuildPortPidMap();
+            var nameCache = new Dictionary<int, string?>();
             var ipGlobalProperties = IPGlobalProperties.GetIPGlobalProperties();
             var connections = ipGlobalProperties.GetActiveTcpConnections();
 
             foreach (var conn in connections)
             {
+                var pid = pidMap.TryGetValue(conn.LocalEndPoint.Port, out var found) ? found : 0;
                 portInfo.Add(new PortMonitorInfo
                 {
                     Port = conn.LocalEndPoint.Port,
                     LocalAddress = conn.LocalEndPoint.Address.ToString(),
                     RemoteAddress = conn.RemoteEndPoint.Address.ToString(),
                     State = conn.State.ToString(),
-                    ProcessId = GetProcessIdForPort(conn.LocalEndPoint.Port),
-                    ProcessName = GetProcessNameForPort(conn.LocalEndPoint.Port)
+                    ProcessId = pid,
+                    ProcessName = GetProcessNameForPid(pid, nameCache)
                 });
             }
         }
@@ -288,28 +291,69 @@ public class NetworkService : INetworkService
         return portInfo;
     }
 
-    private int GetProcessIdForPort(int port)
+    private static Dictionary<int, int> BuildPortPidMap()
     {
-        // This would require P/Invoke to IPHelper API for full implementation
-        return 0;
+        var map = new Dictionary<int, int>();
+
+        try
+        {
+            var psi = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "netstat.exe",
+                Arguments = "-ano",
+                RedirectStandardOutput = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            using var process = System.Diagnostics.Process.Start(psi);
+            if (process == null) return map;
+
+            string? line;
+            while ((line = process.StandardOutput.ReadLine()) != null)
+            {
+                var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+                if (parts.Length < 4) continue;
+                if (parts[0] != "TCP") continue;
+
+                var local = parts[2];
+                var lastColon = local.LastIndexOf(':');
+                if (lastColon < 0) continue;
+                if (!int.TryParse(local.Substring(lastColon + 1), out var port)) continue;
+                if (!int.TryParse(parts[parts.Length - 1], out var pid)) continue;
+
+                map[port] = pid;
+            }
+
+            process.WaitForExit(2000);
+        }
+        catch (Exception)
+        {
+            // netstat unavailable: fall back to empty map
+        }
+
+        return map;
     }
 
-    private string? GetProcessNameForPort(int port)
+    private static string? GetProcessNameForPid(int pid, Dictionary<int, string?> cache)
     {
-        var pid = GetProcessIdForPort(port);
-        if (pid > 0)
+        if (pid <= 0) return null;
+
+        if (cache.TryGetValue(pid, out var cached)) return cached;
+
+        string? name = null;
+        try
         {
-            try
-            {
-                using var process = System.Diagnostics.Process.GetProcessById(pid);
-                return process.ProcessName;
-            }
-            catch
-            {
-                return null;
-            }
+            using var processItem = System.Diagnostics.Process.GetProcessById(pid);
+            name = processItem.ProcessName;
         }
-        return null;
+        catch
+        {
+            name = null;
+        }
+
+        cache[pid] = name;
+        return name;
     }
 
     public async Task<long> DownloadFileAsync(string url, string savePath, IProgress<double>? progress = null, CancellationToken ct = default)

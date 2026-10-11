@@ -7,26 +7,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SystemToolkit.App", "System
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SystemToolkit.Core", "SystemToolkit.Core\SystemToolkit.Core.csproj", "{B2C3D4E5-F6A7-8901-BCDE-F12345678901}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SystemToolkit.Modules.FileManager", "SystemToolkit.Modules\FileManager\SystemToolkit.Modules.FileManager.csproj", "{C3D4E5F6-A7B8-9012-CDEF-123456789012}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SystemToolkit.Modules.RegistryTools", "SystemToolkit.Modules\RegistryTools\SystemToolkit.Modules.RegistryTools.csproj", "{D4E5F6A7-B8C9-0123-DEF0-234567890123}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SystemToolkit.Modules.ServiceManager", "SystemToolkit.Modules\ServiceManager\SystemToolkit.Modules.ServiceManager.csproj", "{E5F6A7B8-C9D0-1234-EF01-345678901234}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SystemToolkit.Modules.ProcessManager", "SystemToolkit.Modules\ProcessManager\SystemToolkit.Modules.ProcessManager.csproj", "{F6A7B8C9-D0E1-2345-F012-456789012345}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SystemToolkit.Modules.DiskManager", "SystemToolkit.Modules\DiskManager\SystemToolkit.Modules.DiskManager.csproj", "{A7B8C9D0-E1F2-3456-0123-567890123456}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SystemToolkit.Modules.NetworkTools", "SystemToolkit.Modules\NetworkTools\SystemToolkit.Modules.NetworkTools.csproj", "{B8C9D0E1-F2A3-4567-1234-678901234567}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SystemToolkit.Modules.DevTools", "SystemToolkit.Modules\DevTools\SystemToolkit.Modules.DevTools.csproj", "{C9D0E1F2-A3B4-5678-2345-789012345678}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SystemToolkit.Modules.DataTools", "SystemToolkit.Modules\DataTools\SystemToolkit.Modules.DataTools.csproj", "{D0E1F2A3-B4C5-6789-3456-890123456789}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SystemToolkit.Modules.ProductivityTools", "SystemToolkit.Modules\ProductivityTools\SystemToolkit.Modules.ProductivityTools.csproj", "{E1F2A3B4-C5D6-7890-4567-901234567890}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SystemToolkit.Modules.MonitorTools", "SystemToolkit.Modules\MonitorTools\SystemToolkit.Modules.MonitorTools.csproj", "{F2A3B4C5-D6E7-8901-5678-012345678901}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SystemToolkit.Tests", "SystemToolkit.Tests\SystemToolkit.Tests.csproj", "{A3B4C5D6-E7F8-9012-6789-123456789012}"
 EndProject
 Global

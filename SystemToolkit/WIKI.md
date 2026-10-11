@@ -1,5 +1,7 @@
 # SystemToolkit Wiki
 
+> 状态勘误（2026-10-09）：本文是开发阶段快照。当前构建为 App/Core/Tests 三个项目,功能模块统一位于 SystemToolkit.Core/Services，菜单只暴露已接入 UI 的功能。最新口径见仓库根 README 与 SystemToolkit/README.md。
+
 欢迎使用 SystemToolkit！本 Wiki 包含详细的使用指南、功能说明和常见问题解答。
 
 ---

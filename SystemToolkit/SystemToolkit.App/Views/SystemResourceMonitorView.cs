@@ -4,7 +4,7 @@ using SystemToolkit.Core.Services;
 using System.Windows.Data;
 using System.Windows.Media;
 
-namespace SystemToolkit.App.ViewModels;
+namespace SystemToolkit.App.Views;
 
 public class SystemResourceMonitorView : UserControl, IDisposable
 {
@@ -16,9 +16,9 @@ public class SystemResourceMonitorView : UserControl, IDisposable
     private readonly CancellationTokenSource _cts;
     private bool _disposed;
 
-    public SystemResourceMonitorView()
+    public SystemResourceMonitorView(IMonitorService monitorService)
     {
-        _monitorService = new MonitorService();
+        _monitorService = monitorService;
         _cts = new CancellationTokenSource();
 
         var grid = new Grid();

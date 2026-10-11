@@ -10,44 +10,23 @@ public interface IRegistryService
     void DeleteValue(string keyPath, string valueName);
     void DeleteKey(string keyPath, bool recursive = false);
     void SetValue(string keyPath, string valueName, object value, RegistryValueKind kind = RegistryValueKind.String);
-    Task<string> BackupRegistryAsync(string backupPath, CancellationToken ct = default);
+    Task<string> BackupRegistryAsync(string hivePath, string backupDirectory, CancellationToken ct = default);
     Task RestoreRegistryAsync(string backupPath, CancellationToken ct = default);
     List<RegistryItem> FindInvalidKeys();
 }
 
 public class RegistryService : IRegistryService
 {
-    private static readonly string[] RootKeys = {
-        @"HKEY_CURRENT_USER",
-        @"HKEY_LOCAL_MACHINE",
-        @"HKEY_CLASSES_ROOT",
-        @"HKEY_USERS",
-        @"HKEY_CURRENT_CONFIG"
-    };
-
     public List<RegistryItem> GetRegistryValues(string keyPath)
     {
         var items = new List<RegistryItem>();
 
         try
         {
-            using var key = Registry.CurrentUser.OpenSubKey(keyPath.Replace(@"HKEY_CURRENT_USER\", "") ?? keyPath);
+            using var key = OpenKey(keyPath, writable: false);
             if (key == null) return items;
 
-            foreach (var valueName in key.GetValueNames())
-            {
-                var value = key.GetValue(valueName);
-                var valueKind = key.GetValueKind(valueName);
-
-                items.Add(new RegistryItem
-                {
-                    KeyPath = keyPath,
-                    ValueName = valueName,
-                    Value = value?.ToString(),
-                    ValueType = valueKind.ToString(),
-                    ModifiedTime = null
-                });
-            }
+            ReadValues(key, keyPath, items);
         }
         catch (UnauthorizedAccessException)
         {
@@ -67,12 +46,13 @@ public class RegistryService : IRegistryService
 
         try
         {
-            using var key = Registry.CurrentUser.OpenSubKey(keyPath.Replace(@"HKEY_CURRENT_USER\", "") ?? keyPath);
+            using var key = OpenKey(keyPath, writable: false);
             if (key == null) return subKeys;
 
+            var normalized = keyPath.TrimEnd('\\');
             foreach (var subKeyName in key.GetSubKeyNames())
             {
-                subKeys.Add($@"{keyPath}\{subKeyName}");
+                subKeys.Add($@"{normalized}\{subKeyName}");
             }
         }
         catch (Exception)
@@ -87,8 +67,16 @@ public class RegistryService : IRegistryService
     {
         try
         {
-            using var key = Registry.CurrentUser.OpenSubKey(keyPath, true);
-            key?.DeleteValue(valueName, false);
+            using var key = OpenKey(keyPath, writable: true);
+            if (key == null)
+            {
+                throw new InvalidOperationException($"注册表项不存在：{keyPath}");
+            }
+            key.DeleteValue(valueName, false);
+        }
+        catch (InvalidOperationException)
+        {
+            throw;
         }
         catch (Exception)
         {
@@ -100,14 +88,21 @@ public class RegistryService : IRegistryService
     {
         try
         {
-            var parts = keyPath.Split('\\');
+            var parts = keyPath.TrimEnd('\\').Split('\\');
             var parentPath = string.Join("\\", parts.Take(parts.Length - 1));
             var keyName = parts.Last();
 
-            using var parentKey = Registry.CurrentUser.OpenSubKey(parentPath, true);
+            using var parentKey = OpenKey(parentPath, writable: true);
             if (parentKey != null)
             {
-                parentKey.DeleteSubKeyTree(keyName, recursive);
+                if (recursive)
+                {
+                    parentKey.DeleteSubKeyTree(keyName, throwOnMissingSubKey: false);
+                }
+                else
+                {
+                    parentKey.DeleteSubKey(keyName, throwOnMissingSubKey: false);
+                }
             }
         }
         catch (Exception)
@@ -120,8 +115,16 @@ public class RegistryService : IRegistryService
     {
         try
         {
-            using var key = Registry.CurrentUser.CreateSubKey(keyPath, true);
-            key?.SetValue(valueName, value, kind);
+            using var key = OpenKey(keyPath, writable: true) ?? OpenWritableHiveOrCreateSubKey(keyPath);
+            if (key == null)
+            {
+                throw new InvalidOperationException($"无法打开注册表项：{keyPath}");
+            }
+            key.SetValue(valueName, value, kind);
+        }
+        catch (InvalidOperationException)
+        {
+            throw;
         }
         catch (Exception)
         {
@@ -129,9 +132,10 @@ public class RegistryService : IRegistryService
         }
     }
 
-    public async Task<string> BackupRegistryAsync(string backupPath, CancellationToken ct = default)
+    public async Task<string> BackupRegistryAsync(string hivePath, string backupDirectory, CancellationToken ct = default)
     {
-        var backupFile = Path.Combine(backupPath, $"registry_backup_{DateTime.Now:yyyyMMdd_HHmmss}.reg");
+        var dir = Path.GetFileName(hivePath.TrimEnd('\\'));
+        var backupFile = Path.Combine(backupDirectory, $"{dir}_{DateTime.Now:yyyyMMdd_HHmmss}.reg");
 
         await Task.Run(() =>
         {
@@ -139,70 +143,73 @@ public class RegistryService : IRegistryService
             writer.WriteLine("Windows Registry Editor Version 5.00");
             writer.WriteLine();
 
-            foreach (var rootKey in RootKeys)
-            {
-                ct.ThrowIfCancellationRequested();
-                WriteKeyToBackup(writer, rootKey);
-            }
+            ct.ThrowIfCancellationRequested();
+            using var root = OpenKey(hivePath, writable: false)
+                ?? throw new InvalidOperationException($"无法打开注册表根：{hivePath}");
+            WriteKeyRecursive(writer, hivePath.TrimEnd('\\'), root, ct);
         }, ct);
 
         return backupFile;
     }
 
-    private void WriteKeyToBackup(StreamWriter writer, string keyPath)
+    private void WriteKeyRecursive(StreamWriter writer, string keyPath, RegistryKey key, CancellationToken ct)
     {
-        try
+        ct.ThrowIfCancellationRequested();
+
+        writer.WriteLine($"[{keyPath}]");
+        foreach (var valueName in key.GetValueNames())
         {
-            using var key = GetRegistryKey(keyPath);
-            if (key == null) return;
+            WriteRegistryValue(writer, valueName, key.GetValue(valueName), key.GetValueKind(valueName));
+        }
+        writer.WriteLine();
 
-            writer.WriteLine($"[{keyPath}]");
-
-            foreach (var valueName in key.GetValueNames())
+        foreach (var subName in key.GetSubKeyNames())
+        {
+            try
             {
-                var value = key.GetValue(valueName);
-                var valueKind = key.GetValueKind(valueName);
-                WriteRegistryValue(writer, valueName, value, valueKind);
+                using var sub = key.OpenSubKey(subName);
+                if (sub != null)
+                {
+                    WriteKeyRecursive(writer, $@"{keyPath}\{subName}", sub, ct);
+                }
             }
-
-            writer.WriteLine();
+            catch (Exception)
+            {
+                // Skip keys that can't be read
+            }
         }
-        catch (Exception)
-        {
-            // Skip keys that can't be read
-        }
-    }
-
-    private RegistryKey? GetRegistryKey(string keyPath)
-    {
-        return keyPath.ToUpperInvariant() switch
-        {
-            string s when s.StartsWith(@"HKEY_CURRENT_USER\") =>
-                Registry.CurrentUser.OpenSubKey(keyPath.Substring(18)),
-            string s when s.StartsWith(@"HKEY_LOCAL_MACHINE\") =>
-                Registry.LocalMachine.OpenSubKey(keyPath.Substring(20)),
-            string s when s.StartsWith(@"HKEY_CLASSES_ROOT\") =>
-                Registry.ClassesRoot.OpenSubKey(keyPath.Substring(19)),
-            string s when s.StartsWith(@"HKEY_USERS\") =>
-                Registry.Users.OpenSubKey(keyPath.Substring(12)),
-            string s when s.StartsWith(@"HKEY_CURRENT_CONFIG\") =>
-                Registry.CurrentConfig.OpenSubKey(keyPath.Substring(21)),
-            _ => null
-        };
     }
 
     private void WriteRegistryValue(StreamWriter writer, string valueName, object? value, RegistryValueKind kind)
     {
-        var valueStr = value switch
+        var namePart = valueName.Length == 0 ? "@" : $"\"{valueName.Replace("\\", "\\\\").Replace("\"", "\\\"")}\"";
+        string valuePart;
+        if (value == null)
         {
-            string s => $"\"{s.Replace("\\", "\\\\").Replace("\"", "\\\"")}\"",
-            int i => $"dword:{i:x8}",
-            long l => $"hex(b):{BitConverter.ToString(BitConverter.GetBytes(l)).Replace("-", ",").ToLower()}",
-            byte[] bytes => $"hex:{BitConverter.ToString(bytes).Replace("-", ",").ToLower()}",
-            _ => $"\"{value?.ToString() ?? ""}\""
-        };
+            valuePart = "\"\"";
+        }
+        else if (value is int i)
+        {
+            valuePart = $"dword:{i:x8}";
+        }
+        else if (value is long l)
+        {
+            valuePart = $"hex(b):{BitConverter.ToString(BitConverter.GetBytes(l)).Replace("-", ",")}";
+        }
+        else if (value is byte[] bytes)
+        {
+            valuePart = $"hex:{BitConverter.ToString(bytes).Replace("-", ",")}";
+        }
+        else if (value is string[] strs)
+        {
+            valuePart = $"hex(7):{BitConverter.ToString(System.Text.Encoding.Unicode.GetBytes(string.Join('\0', strs) + "\0\0")).Replace("-", ",")}";
+        }
+        else
+        {
+            valuePart = $"\"{value.ToString()?.Replace("\\", "\\\\").Replace("\"", "\\\"") ?? ""}\"";
+        }
 
-        writer.WriteLine($"\"{valueName}\"={valueStr}");
+        writer.WriteLine($"{namePart}={valuePart}");
     }
 
     public Task RestoreRegistryAsync(string backupPath, CancellationToken ct = default)
@@ -226,7 +233,6 @@ public class RegistryService : IRegistryService
     {
         var invalidKeys = new List<RegistryItem>();
 
-        // 检查常见的无效注册表项位置
         var commonInvalidPaths = new[]
         {
             @"HKEY_CURRENT_USER\Software\Microsoft\Windows\CurrentVersion\Run",
@@ -240,13 +246,12 @@ public class RegistryService : IRegistryService
             var values = GetRegistryValues(path);
             foreach (var value in values)
             {
-                // 检查文件路径是否存在
                 if (!string.IsNullOrEmpty(value.Value) &&
                     (value.Value.StartsWith("\"") || value.Value.Contains(":\\")))
                 {
                     var filePath = value.Value.Trim('"');
                     if (!string.IsNullOrEmpty(filePath) &&
-                        filePath.Contains(":\\" ) &&
+                        filePath.Contains(":\\") &&
                         !File.Exists(filePath) &&
                         !Directory.Exists(filePath))
                     {
@@ -257,5 +262,68 @@ public class RegistryService : IRegistryService
         }
 
         return invalidKeys;
+    }
+
+    private static void ReadValues(RegistryKey key, string keyPath, List<RegistryItem> items)
+    {
+        foreach (var valueName in key.GetValueNames())
+        {
+            items.Add(new RegistryItem
+            {
+                KeyPath = keyPath,
+                ValueName = valueName,
+                Value = key.GetValue(valueName)?.ToString(),
+                ValueType = key.GetValueKind(valueName).ToString(),
+                ModifiedTime = null
+            });
+        }
+    }
+
+    private static RegistryKey? OpenKey(string keyPath, bool writable)
+    {
+        if (string.IsNullOrWhiteSpace(keyPath)) return null;
+
+        var trimmed = keyPath.TrimEnd('\\');
+        var separator = trimmed.IndexOf('\\');
+        var hiveName = separator < 0 ? trimmed : trimmed.Substring(0, separator);
+        var relative = separator < 0 ? null : trimmed.Substring(separator + 1);
+
+        var hive = hiveName.ToUpperInvariant() switch
+        {
+            "HKEY_CURRENT_USER" or "HKCU" => Registry.CurrentUser,
+            "HKEY_LOCAL_MACHINE" or "HKLM" => Registry.LocalMachine,
+            "HKEY_CLASSES_ROOT" or "HKCR" => Registry.ClassesRoot,
+            "HKEY_USERS" or "HKU" => Registry.Users,
+            "HKEY_CURRENT_CONFIG" or "HKCC" => Registry.CurrentConfig,
+            "HKEY_PERFORMANCE_DATA" => Registry.PerformanceData,
+            _ => null
+        };
+
+        if (hive == null) return null;
+        if (string.IsNullOrEmpty(relative)) return hive;
+
+        return hive.OpenSubKey(relative, writable);
+    }
+
+    private static RegistryKey? OpenWritableHiveOrCreateSubKey(string keyPath)
+    {
+        var trimmed = keyPath.TrimEnd('\\');
+        var separator = trimmed.IndexOf('\\');
+        if (separator < 0) return null;
+
+        var hiveName = trimmed.Substring(0, separator);
+        var relative = trimmed.Substring(separator + 1);
+
+        var hive = hiveName.ToUpperInvariant() switch
+        {
+            "HKEY_CURRENT_USER" or "HKCU" => Registry.CurrentUser,
+            "HKEY_LOCAL_MACHINE" or "HKLM" => Registry.LocalMachine,
+            "HKEY_CLASSES_ROOT" or "HKCR" => Registry.ClassesRoot,
+            "HKEY_USERS" or "HKU" => Registry.Users,
+            "HKEY_CURRENT_CONFIG" or "HKCC" => Registry.CurrentConfig,
+            _ => null
+        };
+
+        return hive?.CreateSubKey(relative);
     }
 }

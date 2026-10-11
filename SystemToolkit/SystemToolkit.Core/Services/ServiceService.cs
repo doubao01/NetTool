@@ -157,8 +157,8 @@ public class ServiceService : IServiceService
         try
         {
             using var hklm = Microsoft.Win32.Registry.LocalMachine;
-            using var key = hklm.OpenSubKey($@"SYSTEM\CurrentControlSet\Services\{serviceName}\Description");
-            return key?.GetValue(null)?.ToString() ?? string.Empty;
+            using var key = hklm.OpenSubKey($@"SYSTEM\CurrentControlSet\Services\{serviceName}");
+            return key?.GetValue("Description")?.ToString() ?? string.Empty;
         }
         catch (Exception)
         {

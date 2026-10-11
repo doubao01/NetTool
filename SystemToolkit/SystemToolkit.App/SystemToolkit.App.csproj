@@ -19,16 +19,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\SystemToolkit.Core\SystemToolkit.Core.csproj" />
-    <ProjectReference Include="..\SystemToolkit.Modules\FileManager\SystemToolkit.Modules.FileManager.csproj" />
-    <ProjectReference Include="..\SystemToolkit.Modules\RegistryTools\SystemToolkit.Modules.RegistryTools.csproj" />
-    <ProjectReference Include="..\SystemToolkit.Modules\ServiceManager\SystemToolkit.Modules.ServiceManager.csproj" />
-    <ProjectReference Include="..\SystemToolkit.Modules\ProcessManager\SystemToolkit.Modules.ProcessManager.csproj" />
-    <ProjectReference Include="..\SystemToolkit.Modules\DiskManager\SystemToolkit.Modules.DiskManager.csproj" />
-    <ProjectReference Include="..\SystemToolkit.Modules\NetworkTools\SystemToolkit.Modules.NetworkTools.csproj" />
-    <ProjectReference Include="..\SystemToolkit.Modules\DevTools\SystemToolkit.Modules.DevTools.csproj" />
-    <ProjectReference Include="..\SystemToolkit.Modules\DataTools\SystemToolkit.Modules.DataTools.csproj" />
-    <ProjectReference Include="..\SystemToolkit.Modules\ProductivityTools\SystemToolkit.Modules.ProductivityTools.csproj" />
-    <ProjectReference Include="..\SystemToolkit.Modules\MonitorTools\SystemToolkit.Modules.MonitorTools.csproj" />
   </ItemGroup>
 
 </Project>

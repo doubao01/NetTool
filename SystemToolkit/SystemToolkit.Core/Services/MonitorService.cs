@@ -13,6 +13,7 @@ public interface IMonitorService
     NetworkMonitorInfo GetNetworkMonitorInfo();
     Task<NetworkMonitorInfo> MonitorNetworkAsync(int intervalSeconds = 5, int historyLength = 60, CancellationToken ct = default);
     Task SetApplicationMonitorAsync(string processName, bool autoRestart, CancellationToken ct = default);
+    void RemoveApplicationMonitor(string processName);
     List<ApplicationMonitorInfo> GetMonitoredApplications();
     List<MonitorAlert> GetMonitorAlerts();
 }
@@ -23,6 +24,8 @@ public class MonitorService : IMonitorService
     private static PerformanceCounter? _memoryCounter;
     private static readonly Dictionary<string, ApplicationMonitorInfo> MonitoredApps = new();
     private static readonly List<MonitorAlert> Alerts = new();
+    private static readonly object AlertsSync = new();
+    private static readonly object AppsSync = new();
     private static readonly double[] CpuHistory = new double[60];
     private static readonly double[] MemoryHistory = new double[60];
 
@@ -76,7 +79,7 @@ public class MonitorService : IMonitorService
             // Check for alerts
             if (info.CpuUsage > 90)
             {
-                Alerts.Add(new MonitorAlert
+                AddAlert(new MonitorAlert
                 {
                     AlertType = "CPU",
                     Message = $"CPU 使用率过高：{info.CpuUsage:F1}%",
@@ -87,7 +90,7 @@ public class MonitorService : IMonitorService
 
             if (info.MemoryUsage > 90)
             {
-                Alerts.Add(new MonitorAlert
+                AddAlert(new MonitorAlert
                 {
                     AlertType = "Memory",
                     Message = $"内存使用率过高：{info.MemoryUsage:F1}%",
@@ -147,7 +150,7 @@ public class MonitorService : IMonitorService
             // Check for low space alert
             if (info.UsagePercentage < 10)
             {
-                Alerts.Add(new MonitorAlert
+                AddAlert(new MonitorAlert
                 {
                     AlertType = "Disk",
                     Message = $"磁盘空间不足 ({driveName}): 剩余 {info.FreeSpace / 1024.0 / 1024.0 / 1024.0:F1} GB",
@@ -235,14 +238,17 @@ public class MonitorService : IMonitorService
 
     public async Task SetApplicationMonitorAsync(string processName, bool autoRestart, CancellationToken ct = default)
     {
-        if (!MonitoredApps.ContainsKey(processName))
+        lock (AppsSync)
         {
-            MonitoredApps[processName] = new ApplicationMonitorInfo
+            if (!MonitoredApps.ContainsKey(processName))
             {
-                ProcessName = processName,
-                AutoRestart = autoRestart,
-                CreatedTime = DateTime.Now
-            };
+                MonitoredApps[processName] = new ApplicationMonitorInfo
+                {
+                    ProcessName = processName,
+                    AutoRestart = autoRestart,
+                    CreatedTime = DateTime.Now
+                };
+            }
         }
 
         // Start monitoring
@@ -250,13 +256,22 @@ public class MonitorService : IMonitorService
         {
             while (!ct.IsCancellationRequested)
             {
-                var appInfo = MonitoredApps[processName];
+                ApplicationMonitorInfo appInfo;
+                lock (AppsSync)
+                {
+                    appInfo = MonitoredApps[processName];
+                }
 
                 var isRunning = Process.GetProcessesByName(processName).Any();
                 appInfo.IsRunning = isRunning;
 
-                if (!isRunning)
+                if (isRunning)
                 {
+                    appInfo.WasRunning = true;
+                }
+                else if (appInfo.WasRunning)
+                {
+                    appInfo.WasRunning = false;
                     appInfo.CrashCount++;
                     appInfo.LastCrashTime = DateTime.Now;
 
@@ -264,12 +279,18 @@ public class MonitorService : IMonitorService
                     {
                         try
                         {
-                            // Try to restart the process
                             Process.Start(new ProcessStartInfo(processName) { UseShellExecute = true });
+                            AddAlert(new MonitorAlert
+                            {
+                                AlertType = "Application",
+                                Message = $"{processName} 已停止，正在尝试自动重启",
+                                Level = AlertLevel.Warning,
+                                Timestamp = DateTime.Now
+                            });
                         }
                         catch (Exception ex)
                         {
-                            Alerts.Add(new MonitorAlert
+                            AddAlert(new MonitorAlert
                             {
                                 AlertType = "Application",
                                 Message = $"{processName} 重启失败：{ex.Message}",
@@ -280,7 +301,7 @@ public class MonitorService : IMonitorService
                     }
                     else
                     {
-                        Alerts.Add(new MonitorAlert
+                        AddAlert(new MonitorAlert
                         {
                             AlertType = "Application",
                             Message = $"{processName} 已停止运行",
@@ -295,13 +316,39 @@ public class MonitorService : IMonitorService
         }, ct);
     }
 
+    public void RemoveApplicationMonitor(string processName)
+    {
+        lock (AppsSync)
+        {
+            MonitoredApps.Remove(processName);
+        }
+    }
+
     public List<ApplicationMonitorInfo> GetMonitoredApplications()
     {
-        return MonitoredApps.Values.ToList();
+        lock (AppsSync)
+        {
+            return MonitoredApps.Values.ToList();
+        }
     }
 
     public List<MonitorAlert> GetMonitorAlerts()
     {
-        return Alerts.OrderByDescending(a => a.Timestamp).Take(100).ToList();
+        lock (AlertsSync)
+        {
+            return Alerts.OrderByDescending(a => a.Timestamp).Take(100).ToList();
+        }
+    }
+
+    private static void AddAlert(MonitorAlert alert)
+    {
+        lock (AlertsSync)
+        {
+            Alerts.Add(alert);
+            if (Alerts.Count > 500)
+            {
+                Alerts.RemoveRange(0, Alerts.Count - 500);
+            }
+        }
     }
 }

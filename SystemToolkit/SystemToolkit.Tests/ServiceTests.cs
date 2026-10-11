@@ -36,6 +36,32 @@ public class FileServiceTests
     }
 
     [Fact]
+    public async Task PreviewAndBatchRename_AppliesPrefixWithoutOverwrite()
+    {
+        var service = new FileService();
+        var testDir = Path.Combine(Path.GetTempPath(), "RenameTests_" + Guid.NewGuid());
+        Directory.CreateDirectory(testDir);
+        var path = Path.Combine(testDir, "demo.txt");
+        await File.WriteAllTextAsync(path, "x");
+
+        try
+        {
+            var files = await service.GetFilesAsync(testDir);
+            var rule = new RenameRule { Prefix = "new_" };
+            var preview = service.PreviewRename(files, rule);
+            preview.Should().ContainSingle(p => p.Original == "demo.txt" && p.NewName == "new_demo.txt");
+
+            await service.BatchRenameAsync(files, rule);
+            File.Exists(Path.Combine(testDir, "new_demo.txt")).Should().BeTrue();
+            File.Exists(path).Should().BeFalse();
+        }
+        finally
+        {
+            Directory.Delete(testDir, true);
+        }
+    }
+
+    [Fact]
     public void CalculateFileHashAsync_ReturnsValidHash()
     {
         // Arrange

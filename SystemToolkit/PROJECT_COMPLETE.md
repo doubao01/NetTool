@@ -1,5 +1,7 @@
 # SystemToolkit 项目完成说明
 
+> 状态勘误（2026-10-09）：本文是开发阶段快照。当前构建为 App/Core/Tests 三个项目，功能模块统一位于 SystemToolkit.Core/Services，菜单只暴露已接入 UI 的功能。最新口径见仓库根 README 与 SystemToolkit/README.md。
+
 本项目已成功创建，包含完整的系统工具箱应用程序，涵盖 6 大类 30+ 个功能模块。
 
 ---
