@@ -57,3 +57,9 @@ This file records user instructions, preferences, and teachings for reference in
   - xUnit Theory 的 InlineData 值个数必须与方法参数（含可选参数展开口径）一致；同一 Theory 内不要混用不同长度的行。
   - 位流解码（Base32 类）用「解出字节后重新编码并与输入比对」做规范化校验时，构造非零尾部位反例必须先确认目标串不满足重新编码等价，否则会误判为无效。
   - 新增工具三件套同步点：Core 目录与 Execute 分派、Tests 目录断言（数量+id 清单）、MainViewModel 菜单文案与两份 README 计数。
+
+[User Instruction Summary]
+- Date: 2026-10-11
+- Context: NetTool 仓库提交与推送
+- Instructions:
+  - 不要为改动创建功能分支，直接在 master 上提交并推送；临时分支需删除（本地与远程）。
