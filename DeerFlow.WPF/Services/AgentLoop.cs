@@ -184,6 +184,13 @@ public class AgentLoop : IAgentLoop
 
         var lastObservation = string.Empty;
         var noProgressRounds = 0;
+        var consecutiveToolFailures = 0;
+        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        if (config.TimeoutMinutes > 0)
+        {
+            timeoutCts.CancelAfter(TimeSpan.FromMinutes(config.TimeoutMinutes));
+        }
+        var runToken = timeoutCts.Token;
 
         for (var i = 1; i <= maxIterations; i++)
         {
@@ -192,9 +199,9 @@ public class AgentLoop : IAgentLoop
 
             try
             {
-                cancellationToken.ThrowIfCancellationRequested();
+                runToken.ThrowIfCancellationRequested();
 
-                var stepText = await InvokeWithRetryAsync(transcript.ToString(), config, step, cancellationToken)
+                var stepText = await InvokeWithRetryAsync(transcript.ToString(), config, step, runToken)
                     .ConfigureAwait(false);
                 step.ElapsedMs = stepWatch.ElapsedMilliseconds;
                 step.Thought = stepText;
@@ -241,6 +248,25 @@ public class AgentLoop : IAgentLoop
                 result.Answer = stepText;
                 progress?.Report(step);
 
+                if (step.ToolErrors.Count > 0)
+                {
+                    consecutiveToolFailures += step.ToolErrors.Count;
+                }
+                else if (step.ToolCalls.Count > 0)
+                {
+                    consecutiveToolFailures = 0;
+                }
+
+                var failureLimit = Math.Max(1, config.MaxConsecutiveToolFailures);
+                if (consecutiveToolFailures >= failureLimit)
+                {
+                    result.Completed = false;
+                    result.StopReason = "tool_circuit_open";
+                    result.Error = $"连续工具失败 {consecutiveToolFailures} 次，已熔断";
+                    _logger.Warn(result.Error);
+                    break;
+                }
+
                 if (noProgressRounds >= 2)
                 {
                     result.Completed = false;
@@ -251,9 +277,17 @@ public class AgentLoop : IAgentLoop
             }
             catch (OperationCanceledException)
             {
-                result.StopReason = "cancelled";
-                result.Error = "任务已取消";
-                _logger.Info($"智能体循环被取消（第 {i} 轮）");
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    result.StopReason = "cancelled";
+                    result.Error = "任务已取消";
+                }
+                else
+                {
+                    result.StopReason = "timeout";
+                    result.Error = $"超过 {config.TimeoutMinutes} 分钟超时";
+                }
+                _logger.Info($"智能体循环结束（第 {i} 轮）：{result.StopReason}");
                 break;
             }
             catch (Exception ex)
@@ -598,16 +632,24 @@ public class AgentLoop : IAgentLoop
 
             step.ToolCalls.Add(string.IsNullOrEmpty(argsText) ? toolName : $"{toolName}({argsText})");
             var toolWatch = System.Diagnostics.Stopwatch.StartNew();
+            var toolTimeout = TimeSpan.FromSeconds(Math.Clamp(config.ToolTimeoutSeconds, 3, 120));
+            using var toolCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            toolCts.CancelAfter(toolTimeout);
 
             object toolResult;
             try
             {
-                var invocation = await resolvedCall.InvokeAsync(kernel, cancellationToken).ConfigureAwait(false);
+                var invocation = await resolvedCall.InvokeAsync(kernel, toolCts.Token).ConfigureAwait(false);
                 toolResult = invocation.Result ?? string.Empty;
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (OperationCanceledException)
             {
-                throw;
+                step.ToolErrors.Add($"{toolName}: 超时 {config.ToolTimeoutSeconds}s");
+                toolResult = $"工具执行超时：{toolName}";
             }
             catch (Exception ex)
             {

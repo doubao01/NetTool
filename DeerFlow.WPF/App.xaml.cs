@@ -1,3 +1,4 @@
+using System.IO;
 using System.Windows;
 using DeerFlow.WPF.Services;
 using DeerFlow.WPF.Services.Filters;
@@ -99,10 +100,8 @@ public partial class App : Application
         // 1. 注册 Kernel
         services.AddKernel();
 
-        // 2. 注册 OpenAI 连接器（从环境变量读取 API Key）
-        var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY") ?? string.Empty;
-        var baseUrl = Environment.GetEnvironmentVariable("OPENAI_BASE_URL") ?? "https://api.openai.com/v1";
-        var modelId = Environment.GetEnvironmentVariable("OPENAI_MODEL") ?? "gpt-4o";
+        // 2. 注册 OpenAI 连接器：优先设置页密文，其次环境变量
+        var (apiKey, baseUrl, modelId) = ResolveLlmCredentials();
 
         if (!string.IsNullOrEmpty(apiKey))
         {
@@ -167,5 +166,64 @@ public partial class App : Application
 
         var diagnosticsPlugin = serviceProvider.GetRequiredService<DiagnosticsPlugin>();
         kernel.ImportPluginFromObject(diagnosticsPlugin, "diagnostics");
+    }
+
+    private static (string ApiKey, string BaseUrl, string ModelId) ResolveLlmCredentials()
+    {
+        var settingsPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "DeerFlow.WPF", "settings.json");
+
+        var apiKey = Environment.GetEnvironmentVariable("OPENAI_API_KEY") ?? string.Empty;
+        var baseUrl = Environment.GetEnvironmentVariable("OPENAI_BASE_URL") ?? "https://api.openai.com/v1";
+        var modelId = Environment.GetEnvironmentVariable("OPENAI_MODEL")
+            ?? Environment.GetEnvironmentVariable("DEERFLOW_DEFAULT_MODEL")
+            ?? "gpt-4o";
+
+        try
+        {
+            if (!File.Exists(settingsPath))
+            {
+                return (apiKey, baseUrl, modelId);
+            }
+
+            var json = File.ReadAllText(settingsPath);
+            using var doc = System.Text.Json.JsonDocument.Parse(json);
+            var root = doc.RootElement;
+            var store = new DpapiSecretStore();
+
+            if (root.TryGetProperty("ApiKey", out var ak))
+            {
+                var fromSettings = store.Unprotect(ak.GetString() ?? string.Empty);
+                if (!string.IsNullOrWhiteSpace(fromSettings))
+                {
+                    apiKey = fromSettings;
+                }
+            }
+
+            if (root.TryGetProperty("ApiBaseUrl", out var abu))
+            {
+                var url = abu.GetString();
+                if (!string.IsNullOrWhiteSpace(url))
+                {
+                    baseUrl = url;
+                }
+            }
+
+            if (root.TryGetProperty("ModelName", out var mn))
+            {
+                var name = mn.GetString();
+                if (!string.IsNullOrWhiteSpace(name))
+                {
+                    modelId = name;
+                }
+            }
+        }
+        catch
+        {
+            // 设置文件损坏时回退环境变量
+        }
+
+        return (apiKey, baseUrl, modelId);
     }
 }

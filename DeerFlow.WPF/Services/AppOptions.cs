@@ -34,6 +34,15 @@ public sealed class AppOptions
 
     /// <summary>Web 搜索请求超时时间（秒）</summary>
     public int WebSearchTimeoutSeconds { get; set; } = 15;
+
+    /// <summary>单次任务总超时（分钟），0 表示不限制</summary>
+    public int AgentTimeoutMinutes { get; set; } = 15;
+
+    /// <summary>单个工具调用超时（秒）</summary>
+    public int AgentToolTimeoutSeconds { get; set; } = 15;
+
+    /// <summary>连续工具失败达到该值时触发熔断</summary>
+    public int AgentMaxConsecutiveToolFailures { get; set; } = 3;
 }
 
 /// <summary>
@@ -57,6 +66,7 @@ public sealed class AppOptionsProvider : IAppOptionsProvider
     public AppOptionsProvider()
     {
         Options = Load();
+        ApplyUserSettings(Options);
         ApplyEnvironmentOverrides(Options);
     }
 
@@ -101,6 +111,61 @@ public sealed class AppOptionsProvider : IAppOptionsProvider
         if (!string.IsNullOrWhiteSpace(model))
         {
             options.DefaultModel = model;
+        }
+    }
+
+    /// <summary>
+    /// 读取设置页持久化的用户配置（%LocalAppData%\DeerFlow.WPF\settings.json），
+    /// 让保存后的配置在下次启动时直接进入运行快照。
+    /// </summary>
+    private static void ApplyUserSettings(AppOptions options)
+    {
+        try
+        {
+            var path = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "DeerFlow.WPF", "settings.json");
+            if (!File.Exists(path))
+            {
+                return;
+            }
+
+            using var doc = JsonDocument.Parse(File.ReadAllText(path));
+            var root = doc.RootElement;
+
+            if (root.TryGetProperty("ModelProvider", out var mp) && mp.GetString() is { Length: > 0 } provider)
+            {
+                options.DefaultProvider = provider;
+            }
+
+            if (root.TryGetProperty("ModelName", out var mn) && mn.GetString() is { Length: > 0 } model)
+            {
+                options.DefaultModel = model;
+            }
+
+            if (root.TryGetProperty("ApiBaseUrl", out var abu) && abu.GetString() is { Length: > 0 } url)
+            {
+                options.DefaultApiBaseUrl = url;
+            }
+
+            if (root.TryGetProperty("AgentTimeoutMinutes", out var tm) && tm.TryGetInt32(out var minutes) && minutes >= 0)
+            {
+                options.AgentTimeoutMinutes = minutes;
+            }
+
+            if (root.TryGetProperty("AgentToolTimeoutSeconds", out var tts) && tts.TryGetInt32(out var seconds) && seconds >= 3 && seconds <= 120)
+            {
+                options.AgentToolTimeoutSeconds = seconds;
+            }
+
+            if (root.TryGetProperty("AgentMaxConsecutiveToolFailures", out var cf) && cf.TryGetInt32(out var failures) && failures >= 1)
+            {
+                options.AgentMaxConsecutiveToolFailures = failures;
+            }
+        }
+        catch
+        {
+            // 设置文件损坏时保持默认值
         }
     }
 }

@@ -35,6 +35,34 @@ public class SettingsViewModel : ViewModelBase
         set => SetProperty(ref _apiBaseUrl, value);
     }
 
+    private string _modelName;
+    public string ModelName
+    {
+        get => _modelName;
+        set => SetProperty(ref _modelName, value);
+    }
+
+    private int _agentTimeoutMinutes;
+    public int AgentTimeoutMinutes
+    {
+        get => _agentTimeoutMinutes;
+        set => SetProperty(ref _agentTimeoutMinutes, value);
+    }
+
+    private int _agentToolTimeoutSeconds;
+    public int AgentToolTimeoutSeconds
+    {
+        get => _agentToolTimeoutSeconds;
+        set => SetProperty(ref _agentToolTimeoutSeconds, value);
+    }
+
+    private int _agentMaxConsecutiveToolFailures;
+    public int AgentMaxConsecutiveToolFailures
+    {
+        get => _agentMaxConsecutiveToolFailures;
+        set => SetProperty(ref _agentMaxConsecutiveToolFailures, value);
+    }
+
     private string _apiKey = string.Empty;
     public string ApiKey
     {
@@ -115,6 +143,10 @@ public class SettingsViewModel : ViewModelBase
         _options = options ?? App.Services.GetService<IAppOptionsProvider>()?.Options ?? new AppOptions();
         _modelProvider = _options.DefaultProvider;
         _apiBaseUrl = _options.DefaultApiBaseUrl;
+        _modelName = _options.DefaultModel;
+        _agentTimeoutMinutes = _options.AgentTimeoutMinutes;
+        _agentToolTimeoutSeconds = _options.AgentToolTimeoutSeconds;
+        _agentMaxConsecutiveToolFailures = _options.AgentMaxConsecutiveToolFailures;
         _settingsPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "DeerFlow.WPF", SETTINGS_FILENAME);
@@ -200,10 +232,18 @@ public class SettingsViewModel : ViewModelBase
 
             if (root.TryGetProperty("ModelProvider", out var mp))
                 ModelProvider = mp.GetString() ?? _options.DefaultProvider;
+            if (root.TryGetProperty("ModelName", out var mn))
+                ModelName = mn.GetString() ?? _options.DefaultModel;
             if (root.TryGetProperty("ApiBaseUrl", out var abu))
                 ApiBaseUrl = abu.GetString() ?? _options.DefaultApiBaseUrl;
             if (root.TryGetProperty("ApiKey", out var ak))
                 ApiKey = _secretStore.Unprotect(ak.GetString() ?? string.Empty);
+            if (root.TryGetProperty("AgentTimeoutMinutes", out var atm))
+                AgentTimeoutMinutes = atm.GetInt32();
+            if (root.TryGetProperty("AgentToolTimeoutSeconds", out var atts))
+                AgentToolTimeoutSeconds = atts.GetInt32();
+            if (root.TryGetProperty("AgentMaxConsecutiveToolFailures", out var amctf))
+                AgentMaxConsecutiveToolFailures = amctf.GetInt32();
             if (root.TryGetProperty("EnableLocalInference", out var eli))
                 EnableLocalInference = eli.GetBoolean();
             if (root.TryGetProperty("EnableSandbox", out var es))
@@ -211,6 +251,8 @@ public class SettingsViewModel : ViewModelBase
             if (root.TryGetProperty("AutoSaveMemory", out var asm))
                 AutoSaveMemory = asm.GetBoolean();
 
+            ApplyRuntimeCredentials();
+            SyncRuntimeSnapshot();
             _logger.Info("设置已从磁盘加载");
         }
         catch (Exception ex)
@@ -235,8 +277,12 @@ public class SettingsViewModel : ViewModelBase
             var settings = new
             {
                 ModelProvider,
+                ModelName,
                 ApiBaseUrl,
                 ApiKey = _secretStore.Protect(ApiKey),
+                AgentTimeoutMinutes,
+                AgentToolTimeoutSeconds,
+                AgentMaxConsecutiveToolFailures,
                 EnableLocalInference,
                 EnableSandbox,
                 AutoSaveMemory
@@ -248,6 +294,8 @@ public class SettingsViewModel : ViewModelBase
             });
 
             File.WriteAllText(_settingsPath, json);
+            ApplyRuntimeCredentials();
+            SyncRuntimeSnapshot();
             _logger.Info("设置已保存到磁盘");
         }
         catch (Exception ex)
@@ -256,14 +304,72 @@ public class SettingsViewModel : ViewModelBase
         }
     }
 
+    private void ApplyRuntimeCredentials()
+    {
+        if (!string.IsNullOrWhiteSpace(ApiKey))
+        {
+            Environment.SetEnvironmentVariable("OPENAI_API_KEY", ApiKey);
+        }
+
+        if (!string.IsNullOrWhiteSpace(ApiBaseUrl))
+        {
+            Environment.SetEnvironmentVariable("OPENAI_BASE_URL", ApiBaseUrl);
+            Environment.SetEnvironmentVariable("DEERFLOW_API_BASE_URL", ApiBaseUrl);
+        }
+
+        if (!string.IsNullOrWhiteSpace(ModelProvider))
+        {
+            Environment.SetEnvironmentVariable("DEERFLOW_API_PROVIDER", ModelProvider);
+        }
+
+        if (!string.IsNullOrWhiteSpace(ModelName))
+        {
+            Environment.SetEnvironmentVariable("DEERFLOW_DEFAULT_MODEL", ModelName);
+        }
+
+        ApiKeyStatusTextNotify();
+    }
+
+    private void ApiKeyStatusTextNotify() => OnPropertyChanged(nameof(ApiKeyStatusText));
+
+    /// <summary>
+    /// 把当前设置写回运行配置快照，使保存后立即对智能体循环生效。
+    /// </summary>
+    private void SyncRuntimeSnapshot()
+    {
+        if (!string.IsNullOrWhiteSpace(ModelProvider))
+        {
+            _options.DefaultProvider = ModelProvider;
+        }
+
+        if (!string.IsNullOrWhiteSpace(ModelName))
+        {
+            _options.DefaultModel = ModelName;
+        }
+
+        if (!string.IsNullOrWhiteSpace(ApiBaseUrl))
+        {
+            _options.DefaultApiBaseUrl = ApiBaseUrl;
+        }
+
+        _options.AgentTimeoutMinutes = AgentTimeoutMinutes < 0 ? 0 : AgentTimeoutMinutes;
+        _options.AgentToolTimeoutSeconds = Math.Clamp(AgentToolTimeoutSeconds, 3, 120);
+        _options.AgentMaxConsecutiveToolFailures = Math.Max(1, AgentMaxConsecutiveToolFailures);
+    }
+
     /// <summary>
     /// 重置设置为默认值
     /// </summary>
     private void ResetSettings()
     {
-        ModelProvider = _options.DefaultProvider;
-        ApiBaseUrl = _options.DefaultApiBaseUrl;
+        var defaults = new AppOptions();
+        ModelProvider = defaults.DefaultProvider;
+        ModelName = defaults.DefaultModel;
+        ApiBaseUrl = defaults.DefaultApiBaseUrl;
         ApiKey = string.Empty;
+        AgentTimeoutMinutes = defaults.AgentTimeoutMinutes;
+        AgentToolTimeoutSeconds = defaults.AgentToolTimeoutSeconds;
+        AgentMaxConsecutiveToolFailures = defaults.AgentMaxConsecutiveToolFailures;
         EnableLocalInference = true;
         EnableSandbox = true;
         AutoSaveMemory = true;

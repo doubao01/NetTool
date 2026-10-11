@@ -1,28 +1,17 @@
+using System.Diagnostics;
 using System.IO;
+using System.Text;
 
 namespace DeerFlow.WPF.Services;
 
-/// <summary>
-/// 沙箱管理器接口
-/// </summary>
 public interface ISandboxManager
 {
-    /// <summary>创建沙箱工作目录</summary>
     Task<string> CreateSandboxAsync(string taskId);
-
-    /// <summary>销毁沙箱并清理资源</summary>
     Task DestroySandboxAsync(string taskId);
-
-    /// <summary>获取沙箱文件列表</summary>
     Task<List<string>> GetSandboxFilesAsync(string taskId);
-
-    /// <summary>在沙箱内执行命令（受限白名单）</summary>
     Task<string> ExecuteInSandboxAsync(string taskId, string command);
 }
 
-/// <summary>
-/// 沙箱管理器，基于文件系统实现任务隔离
-/// </summary>
 public class SandboxManager : ISandboxManager
 {
     private readonly ILoggerService _logger;
@@ -30,11 +19,12 @@ public class SandboxManager : ISandboxManager
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "DeerFlow.WPF", "sandboxes");
 
-    private static readonly string[] AllowedCommands =
+    private static readonly HashSet<string> AllowedCommands = new(StringComparer.OrdinalIgnoreCase)
     {
-        "dir", "ls", "type", "cat", "echo", "mkdir", "findstr",
-        "python", "node", "git", "tree"
+        "dir", "ls", "type", "cat", "echo", "mkdir", "findstr", "tree"
     };
+
+    private const int CommandTimeoutMs = 8000;
 
     public SandboxManager(ILoggerService logger)
     {
@@ -42,27 +32,20 @@ public class SandboxManager : ISandboxManager
         Directory.CreateDirectory(SandboxRoot);
     }
 
-    /// <inheritdoc/>
-    public async Task<string> CreateSandboxAsync(string taskId)
+    public Task<string> CreateSandboxAsync(string taskId)
     {
-        var sandboxPath = Path.Combine(SandboxRoot, taskId);
+        var sandboxPath = ResolveSandboxPath(taskId);
         Directory.CreateDirectory(sandboxPath);
-
         Directory.CreateDirectory(Path.Combine(sandboxPath, "workspace"));
         Directory.CreateDirectory(Path.Combine(sandboxPath, "temp"));
         Directory.CreateDirectory(Path.Combine(sandboxPath, "output"));
-
         _logger.Info($"沙箱已创建: {sandboxPath}");
-
-        await Task.CompletedTask;
-        return sandboxPath;
+        return Task.FromResult(sandboxPath);
     }
 
-    /// <inheritdoc/>
-    public async Task DestroySandboxAsync(string taskId)
+    public Task DestroySandboxAsync(string taskId)
     {
-        var sandboxPath = Path.Combine(SandboxRoot, taskId);
-
+        var sandboxPath = ResolveSandboxPath(taskId);
         if (Directory.Exists(sandboxPath))
         {
             try
@@ -76,37 +59,182 @@ public class SandboxManager : ISandboxManager
             }
         }
 
-        await Task.CompletedTask;
+        return Task.CompletedTask;
     }
 
-    /// <inheritdoc/>
     public Task<List<string>> GetSandboxFilesAsync(string taskId)
     {
-        var sandboxPath = Path.Combine(SandboxRoot, taskId);
-
+        var sandboxPath = ResolveSandboxPath(taskId);
         if (!Directory.Exists(sandboxPath))
+        {
             return Task.FromResult(new List<string>());
+        }
 
         var files = Directory.GetFiles(sandboxPath, "*.*", SearchOption.AllDirectories)
             .Select(f => Path.GetRelativePath(sandboxPath, f))
             .ToList();
-
         return Task.FromResult(files);
     }
 
-    /// <inheritdoc/>
-    public Task<string> ExecuteInSandboxAsync(string taskId, string command)
+    public async Task<string> ExecuteInSandboxAsync(string taskId, string command)
     {
-        var sandboxPath = Path.Combine(SandboxRoot, taskId);
+        if (string.IsNullOrWhiteSpace(command))
+        {
+            return "命令为空";
+        }
 
+        var sandboxPath = ResolveSandboxPath(taskId);
         if (!Directory.Exists(sandboxPath))
-            return Task.FromResult("沙箱不存在");
+        {
+            return "沙箱不存在";
+        }
 
-        var cmdBase = command.Split(' ')[0].ToLower();
-        if (!AllowedCommands.Any(c => c.Equals(cmdBase, StringComparison.OrdinalIgnoreCase)))
-            return Task.FromResult($"命令 '{cmdBase}' 不在白名单中");
+        var tokens = SplitCommand(command);
+        if (tokens.Count == 0)
+        {
+            return "命令为空";
+        }
+
+        var cmdBase = Path.GetFileNameWithoutExtension(tokens[0]);
+        if (!AllowedCommands.Contains(cmdBase))
+        {
+            return $"命令 '{cmdBase}' 不在白名单中";
+        }
+
+        foreach (var token in tokens.Skip(1))
+        {
+            if (LooksLikeAbsolutePath(token) && !IsInsideSandbox(token, sandboxPath))
+            {
+                return "禁止访问沙箱外路径";
+            }
+        }
 
         _logger.Info($"沙箱执行命令: {taskId} -> {command}");
-        return Task.FromResult($"Sandbox[{taskId}] > {command}\n结果: 模拟执行成功");
+
+        try
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = "cmd.exe",
+                Arguments = "/c " + command,
+                WorkingDirectory = Path.Combine(sandboxPath, "workspace"),
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            };
+
+            using var process = Process.Start(psi);
+            if (process is null)
+            {
+                return "无法启动进程";
+            }
+
+            var stdoutTask = process.StandardOutput.ReadToEndAsync();
+            var stderrTask = process.StandardError.ReadToEndAsync();
+            using var cts = new CancellationTokenSource(CommandTimeoutMs);
+            try
+            {
+                await process.WaitForExitAsync(cts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                try { process.Kill(entireProcessTree: true); } catch { }
+                return "命令超时已终止";
+            }
+
+            var output = (await stdoutTask).Trim();
+            var error = (await stderrTask).Trim();
+            var builder = new StringBuilder();
+            builder.AppendLine($"Sandbox[{taskId}] > {command}");
+            if (!string.IsNullOrEmpty(output))
+            {
+                builder.AppendLine(output);
+            }
+            if (!string.IsNullOrEmpty(error))
+            {
+                builder.AppendLine(error);
+            }
+            builder.Append($"exit={process.ExitCode}");
+            return builder.ToString();
+        }
+        catch (Exception ex)
+        {
+            _logger.Error($"沙箱执行失败: {taskId}", ex);
+            return $"执行失败: {ex.Message}";
+        }
+    }
+
+    private static string ResolveSandboxPath(string taskId)
+    {
+        if (string.IsNullOrWhiteSpace(taskId) ||
+            taskId.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 ||
+            taskId.Contains("..", StringComparison.Ordinal))
+        {
+            throw new ArgumentException("非法 taskId", nameof(taskId));
+        }
+
+        return Path.GetFullPath(Path.Combine(SandboxRoot, taskId));
+    }
+
+    private static bool LooksLikeAbsolutePath(string token)
+    {
+        if (token.StartsWith("~", StringComparison.Ordinal) ||
+            token.StartsWith("/", StringComparison.Ordinal) ||
+            token.StartsWith("\\", StringComparison.Ordinal))
+        {
+            return true;
+        }
+
+        return token.Length >= 2 && char.IsLetter(token[0]) && token[1] == ':';
+    }
+
+    private static bool IsInsideSandbox(string path, string sandboxPath)
+    {
+        try
+        {
+            var full = Path.GetFullPath(path);
+            var root = Path.GetFullPath(sandboxPath);
+            return full.StartsWith(root, StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static List<string> SplitCommand(string command)
+    {
+        var result = new List<string>();
+        var current = new StringBuilder();
+        var inQuotes = false;
+        foreach (var ch in command)
+        {
+            if (ch == '"')
+            {
+                inQuotes = !inQuotes;
+                continue;
+            }
+
+            if (char.IsWhiteSpace(ch) && !inQuotes)
+            {
+                if (current.Length > 0)
+                {
+                    result.Add(current.ToString());
+                    current.Clear();
+                }
+            }
+            else
+            {
+                current.Append(ch);
+            }
+        }
+
+        if (current.Length > 0)
+        {
+            result.Add(current.ToString());
+        }
+
+        return result;
     }
 }

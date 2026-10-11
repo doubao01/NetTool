@@ -31,13 +31,14 @@ AI 桌面超级智能体 — 基于 WPF + MVVM 的智能体编排桌面应用，
 - **子智能体并发** - 多个子目标按并发上限同时执行，逐步轨迹标注来源
 - **工具执行循环** - 流式捕获工具调用，手动执行并记录耗时与失败，结果回灌下一轮
 - **无进展保护** - 连续无新观察自动终止，避免空转
+- **硬限制** - 任务总超时、单次工具超时、连续工具失败熔断
 - **AI 执行总结** - 运行结束后生成简明总结（LLM 不可用时回退本地摘要）
 - **执行历史持久化** - 每次运行自动落库 SQLite，编排页可回看/删除历史轨迹
 
 ### 内置工具集
 | 插件 | 函数 | 能力 |
 |------|------|------|
-| sandbox | create/destroy_sandbox, list_files, execute_command | 沙箱隔离执行 |
+| sandbox | create/destroy_sandbox, list_files, execute_command | 目录隔离 + 命令白名单，禁止沙箱外路径 |
 | memory | remember, recall, forget | 会话记忆存取 |
 | web | search_web | 联网搜索 |
 | self_improve | 反思/挖掘/推荐/实验等 8 个函数 | 自我改进 |
@@ -78,7 +79,7 @@ SELF_IMPROVE-reflect_on_recent_tasks  # 查看最近反思
 | **HTTP** | HttpClient + SSE 流式响应 |
 | **日志** | Serilog (文件轮转 10 MB 限制) |
 | **数据库** | SQLite (Microsoft.Data.Sqlite) |
-| **测试** | xUnit + Moq (28 用例) |
+| **测试** | xUnit + Moq（以 `dotnet test` 为准） |
 | **打包** | WiX Toolset MSI |
 | **CI/CD** | GitHub Actions |
 

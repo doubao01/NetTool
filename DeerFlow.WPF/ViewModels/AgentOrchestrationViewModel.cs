@@ -560,7 +560,10 @@ public class AgentOrchestrationViewModel : ViewModelBase
             {
                 Provider = options.DefaultProvider,
                 ModelName = options.DefaultModel,
-                BaseUrl = options.DefaultApiBaseUrl
+                BaseUrl = options.DefaultApiBaseUrl,
+                TimeoutMinutes = options.AgentTimeoutMinutes,
+                ToolTimeoutSeconds = options.AgentToolTimeoutSeconds,
+                MaxConsecutiveToolFailures = options.AgentMaxConsecutiveToolFailures
             };
         }
         catch

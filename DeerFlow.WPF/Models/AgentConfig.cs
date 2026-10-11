@@ -34,4 +34,10 @@ public class AgentConfig
 
     /// <summary>任务超时时间（分钟）</summary>
     public int TimeoutMinutes { get; set; } = 15;
+
+    /// <summary>单次工具调用超时（秒）</summary>
+    public int ToolTimeoutSeconds { get; set; } = 15;
+
+    /// <summary>连续工具失败达到该次数后熔断</summary>
+    public int MaxConsecutiveToolFailures { get; set; } = 3;
 }

@@ -69,4 +69,30 @@ public class SandboxManagerTests
 
         await _sandboxManager.DestroySandboxAsync(taskId);
     }
+
+    [Fact]
+    public async Task ExecuteInSandbox_BlocksAbsolutePathOutsideSandbox()
+    {
+        var taskId = $"test_{Guid.NewGuid():N}";
+        await _sandboxManager.CreateSandboxAsync(taskId);
+
+        var result = await _sandboxManager.ExecuteInSandboxAsync(taskId, @"type C:\Windows\System32\drivers\etc\hosts");
+        Assert.Contains("禁止访问沙箱外路径", result);
+
+        await _sandboxManager.DestroySandboxAsync(taskId);
+    }
+
+    [Fact]
+    public async Task ExecuteInSandbox_BlocksPythonAndGit()
+    {
+        var taskId = $"test_{Guid.NewGuid():N}";
+        await _sandboxManager.CreateSandboxAsync(taskId);
+
+        var python = await _sandboxManager.ExecuteInSandboxAsync(taskId, "python script.py");
+        var git = await _sandboxManager.ExecuteInSandboxAsync(taskId, "git status");
+        Assert.Contains("不在白名单中", python);
+        Assert.Contains("不在白名单中", git);
+
+        await _sandboxManager.DestroySandboxAsync(taskId);
+    }
 }

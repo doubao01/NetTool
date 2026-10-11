@@ -68,7 +68,7 @@ public sealed class SandboxPlugin
     /// <param name="command">要执行的命令</param>
     /// <returns>命令执行结果</returns>
     [KernelFunction("execute_command")]
-    [Description("在沙箱中执行受限命令（白名单控制），如 dir/ls/echo/python/node 等")]
+     [Description("在沙箱中执行受限命令（白名单：dir/ls/type/cat/echo/mkdir/findstr/tree），禁止沙箱外路径")]
     public async Task<string> ExecuteCommand(
         [Description("要执行命令的目标任务 ID")]
         string taskId,

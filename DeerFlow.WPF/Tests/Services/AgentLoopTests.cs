@@ -204,6 +204,20 @@ public class AgentLoopTests
     }
 
     [Fact]
+    public async Task RunAsync_TimeoutMinutesZero_DoesNotTreatAsCancelled()
+    {
+        var chat = new ScriptedChatCompletionService(new[]
+        {
+            "[DONE] 完成"
+        });
+        var loop = new AgentLoop(_logger, BuildKernel(chat));
+
+        var result = await loop.RunAsync("快速任务", new AgentConfig { TimeoutMinutes = 0 });
+
+        Assert.Equal("completed", result.StopReason);
+    }
+
+    [Fact]
     public async Task RunSubAgentsAsync_ReturnsOneResultPerSubGoal()
     {
         var chat = new ScriptedChatCompletionService(new[]

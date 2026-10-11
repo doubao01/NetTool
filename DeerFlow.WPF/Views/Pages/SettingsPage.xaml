@@ -118,6 +118,8 @@
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
                             <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
                         </Grid.RowDefinitions>
 
                         <!-- 卡片标题 -->
@@ -159,6 +161,30 @@
                                     Style="{StaticResource SecondaryButton}" Padding="0"
                                     Command="{Binding ToggleApiKeyVisibilityCommand}" ToolTip="显示/隐藏密钥"/>
                         </Grid>
+
+                        <!-- 模型名称 -->
+                        <TextBlock Grid.Row="7" Text="模型名称" FontSize="13"
+                                   Foreground="{StaticResource TextSecondaryColor}" Margin="0,0,0,8"/>
+                        <TextBox Grid.Row="8" Text="{Binding ModelName}" Height="42" FontSize="14"
+                                 Margin="0,0,0,20"/>
+
+                        <!-- 执行限制 -->
+                        <TextBlock Grid.Row="9" Text="智能体执行限制" FontSize="13"
+                                   Foreground="{StaticResource TextSecondaryColor}" Margin="0,0,0,8"/>
+                        <StackPanel Grid.Row="10" Orientation="Horizontal">
+                            <TextBlock Text="总超时(分钟)" FontSize="12" VerticalAlignment="Center"
+                                       Foreground="{StaticResource TextMutedColor}" Margin="0,0,6,0"/>
+                            <TextBox Text="{Binding AgentTimeoutMinutes}" Width="60" Height="32" FontSize="13"
+                                     Margin="0,0,12,0" ToolTip="填 0 表示不限制总超时"/>
+                            <TextBlock Text="工具超时(秒)" FontSize="12" VerticalAlignment="Center"
+                                       Foreground="{StaticResource TextMutedColor}" Margin="0,0,6,0"/>
+                            <TextBox Text="{Binding AgentToolTimeoutSeconds}" Width="60" Height="32" FontSize="13"
+                                     Margin="0,0,12,0" ToolTip="3-120 秒"/>
+                            <TextBlock Text="熔断阈值" FontSize="12" VerticalAlignment="Center"
+                                       Foreground="{StaticResource TextMutedColor}" Margin="0,0,6,0"/>
+                            <TextBox Text="{Binding AgentMaxConsecutiveToolFailures}" Width="60" Height="32" FontSize="13"
+                                     ToolTip="连续工具失败达到该次数时熔断"/>
+                        </StackPanel>
                     </Grid>
                 </Border>
 
