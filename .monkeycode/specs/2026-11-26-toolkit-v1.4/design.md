@@ -71,7 +71,7 @@ graph TD
 - xUnit + FluentAssertions，新增 5 个测试类共 83 个用例
 - 依赖 Windows 的用例首行 `if (!OperatingSystem.IsWindows()) return;` 守卫
 - 图片处理真实用例覆盖缩放尺寸、输出文件与体积统计
-- 全量 396 项在 Linux 环境验证通过
+- 全量 459 项在 Linux 环境验证通过
 
 ## 依赖
 

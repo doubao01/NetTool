@@ -25,7 +25,7 @@ public interface IConversionService
 public sealed class ConversionService : IConversionService
 {
     public const int MaxInputBytes = 1024 * 1024;
-    public const int MaxQrPayloadBytes = 2048;
+    public const int MaxQrPayloadBytes = 1663;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -52,9 +52,15 @@ public sealed class ConversionService : IConversionService
             throw new FormatException("YAML 语法无效：" + ex.Message, ex);
         }
         if (stream.Documents.Count == 0) return "null";
+        if (IsEmptyPlainScalar(stream.Documents[0].RootNode)) return "null";
         var jsonNode = ConvertYamlNode(stream.Documents[0].RootNode, 0);
         return jsonNode?.ToJsonString(JsonOptions) ?? "null";
     }
+
+    private static bool IsEmptyPlainScalar(YamlNode node) =>
+        node is YamlScalarNode scalar
+        && scalar.Style is YamlDotNet.Core.ScalarStyle.Plain
+        && string.IsNullOrEmpty(scalar.Value);
 
     public string JsonToYaml(string json)
     {
@@ -71,8 +77,9 @@ public sealed class ConversionService : IConversionService
         }
         var serializer = new SerializerBuilder()
             .WithNamingConvention(NullNamingConvention.Instance)
+            .WithQuotingNecessaryStrings()
             .Build();
-        return serializer.Serialize(node is null ? null : ConvertToPlainObject(node));
+        return node is null ? "null" : serializer.Serialize(ConvertToPlainObject(node));
     }
 
     public string MarkdownToHtml(string markdown)
@@ -91,9 +98,21 @@ public sealed class ConversionService : IConversionService
         if (pixelsPerModule is < 1 or > 40) throw new ArgumentOutOfRangeException(nameof(pixelsPerModule), "像素倍率必须在 1 至 40 之间。");
 
         using var generator = new QRCodeGenerator();
-        using var data = generator.CreateQrCode(content, QRCodeGenerator.ECCLevel.Q);
-        var png = new PngByteQRCode(data);
-        return png.GetGraphic(pixelsPerModule);
+        QRCodeData data;
+        try
+        {
+            data = generator.CreateQrCode(content, QRCodeGenerator.ECCLevel.Q);
+        }
+        catch (QRCoder.Exceptions.DataTooLongException ex)
+        {
+            throw new ArgumentException($"二维码内容超出容量上限（约 {MaxQrPayloadBytes} 字节）。", nameof(content), ex);
+        }
+
+        using (data)
+        {
+            var png = new PngByteQRCode(data);
+            return png.GetGraphic(pixelsPerModule);
+        }
     }
 
     public string ImageFileToBase64(string imagePath)
@@ -235,7 +254,7 @@ public sealed class ConversionService : IConversionService
         var value = scalar.Value ?? string.Empty;
         if (scalar.Style is YamlDotNet.Core.ScalarStyle.SingleQuoted or YamlDotNet.Core.ScalarStyle.DoubleQuoted or YamlDotNet.Core.ScalarStyle.Literal)
             return JsonValue.Create(value);
-        if (value.Length == 0) return JsonValue.Create(string.Empty);
+        if (value.Length == 0) return null;
         return value switch
         {
             "~" or "null" or "Null" or "NULL" => null,
@@ -348,13 +367,21 @@ public sealed class ConversionService : IConversionService
                 foreach (var node in nodes)
                 {
                     if (node is not JsonArray array) continue;
-                    var start = ParseSliceBound(parts[0], 0, array.Count);
-                    var end = parts.Length > 1 ? ParseSliceBound(parts[1], array.Count, array.Count) : array.Count;
                     var step = parts.Length > 2 ? ParseStep(parts[2]) : 1;
-                    for (var i = start; i < end && i < array.Count; i += step)
+                    var count = array.Count;
+                    if (step > 0)
                     {
-                        var resolved = i < 0 ? array.Count + i : i;
-                        if (resolved >= 0 && resolved < array.Count) result.Add(array[resolved]);
+                        var start = Clamp(ResolveBound(parts[0], 0, count), 0, count);
+                        var end = Clamp(ResolveBound(parts[1], count, count), 0, count);
+                        for (var i = start; i < end; i += step)
+                            result.Add(array[i]);
+                    }
+                    else
+                    {
+                        var start = Clamp(ResolveBound(parts[0], count - 1, count), -1, count - 1);
+                        var end = Clamp(ResolveBound(parts[1], -1, count), -1, count - 1);
+                        for (var i = start; i > end; i += step)
+                            result.Add(array[i]);
                     }
                 }
                 return result;
@@ -363,14 +390,15 @@ public sealed class ConversionService : IConversionService
             throw new FormatException($"无法解析 JSONPath 方括号内容：{token}。");
         }
 
-        private static int ParseSliceBound(string text, int fallback, int count)
+        private static int ResolveBound(string text, int fallback, int count)
         {
             if (string.IsNullOrWhiteSpace(text)) return fallback;
             if (!int.TryParse(text, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var value))
                 throw new FormatException($"切片下标无效：{text}。");
-            if (value < 0) value = Math.Max(0, count + value);
-            return value;
+            return value < 0 ? count + value : value;
         }
+
+        private static int Clamp(int value, int min, int max) => Math.Clamp(value, min, max);
 
         private static int ParseStep(string text)
         {

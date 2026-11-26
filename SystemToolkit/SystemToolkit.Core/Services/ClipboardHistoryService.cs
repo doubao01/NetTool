@@ -26,7 +26,15 @@ public sealed class ClipboardHistoryService : IClipboardHistoryService
     public int MaxItems
     {
         get => _maxItems;
-        set => _maxItems = Math.Clamp(value, 1, 5000);
+        set
+        {
+            var clamped = Math.Clamp(value, 1, 5000);
+            lock (_sync)
+            {
+                _maxItems = clamped;
+                TrimToLimit();
+            }
+        }
     }
 
     public ClipboardEntry Add(string content, string format = "text")

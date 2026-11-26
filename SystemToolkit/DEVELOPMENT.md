@@ -443,7 +443,7 @@ catch (UnauthorizedAccessException)
 ### v1.4.0 (2026-11-26)
 - 新增颜色工具、格式转换、图片批量处理、剪贴板历史、命令面板五项能力
 - 菜单功能页面增至 30 个，Core 新增 Markdig/YamlDotNet/QRCoder 依赖
-- 单元测试增至 396 个
+- 单元测试增至 459 个
 
 ### v1.0.0 (2026-01-XX)
 - 初始版本发布

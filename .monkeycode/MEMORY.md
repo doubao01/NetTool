@@ -36,7 +36,7 @@ This file records user instructions, preferences, and teachings for reference in
 - Instructions:
   - SystemToolkit 项目（Core/App/Tests）目标框架为 `net10.0-windows`，`SystemToolkit/Directory.Build.props` 已固化 `EnableWindowsTargeting=true`，非 Windows 平台直接构建/测试即可，无需额外传参。
   - 构建：`dotnet build SystemToolkit/SystemToolkit.sln -c Debug`（当前 0 警告 0 错误，StyleCop.Analyzers 已移除）。
-  - 测试：`dotnet test SystemToolkit/SystemToolkit.Tests/SystemToolkit.Tests.csproj -c Debug`（xunit + FluentAssertions + Moq，396 用例；离线工具箱目录测试 `Catalog_ContainsExactlyFiftyFourUniqueToolsWithChineseMetadata` 会逐工具执行 Example，新工具示例必须可确定性运行）。
+  - 测试：`dotnet test SystemToolkit/SystemToolkit.Tests/SystemToolkit.Tests.csproj -c Debug`（xunit + FluentAssertions + Moq，459 用例；离线工具箱目录测试 `Catalog_ContainsExactlyFiftyFourUniqueToolsWithChineseMetadata` 会逐工具执行 Example，新工具示例必须可确定性运行）。
   - CI 在 `windows-latest` 上运行，会执行全部测试；Linux 上仅用于本地快速验证。
 
 [Project Knowledge Summary]
@@ -70,7 +70,7 @@ This file records user instructions, preferences, and teachings for reference in
 - Category: Build Methods
 - Instructions:
   - 本环境无全局 dotnet，可用 SDK 位于 `/tmp/dotnet10`，执行前需 `export DOTNET_ROOT=/tmp/dotnet10 PATH=/tmp/dotnet10:$PATH DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1`。
-  - 编译：`dotnet build SystemToolkit/SystemToolkit.sln -c Debug`；测试：`dotnet test SystemToolkit/SystemToolkit.Tests/SystemToolkit.Tests.csproj -c Debug`。v1.4 完成后为 0 警告 0 错误、396 用例全绿。
+  - 编译：`dotnet build SystemToolkit/SystemToolkit.sln -c Debug`；测试：`dotnet test SystemToolkit/SystemToolkit.Tests/SystemToolkit.Tests.csproj -c Debug`。v1.4 完成后为 0 警告 0 错误、459 用例全绿。
   - Core 新增第三方依赖：Markdig 1.6.0、YamlDotNet 18.1.0、QRCoder 1.9.0，首次需联网还原。
   - 新增功能页同步点共四处：Core 服务与模型、App 视图、`App.xaml.cs` 的 DI 注册、`MainViewModel` 菜单与命令面板关键词；另需更新两份 README 的功能计数。
   - `SystemToolkit/Directory.Build.props` 会屏蔽仓库根同名文件（MSBuild 只自动导入最近一层），因此 Company/Product/Copyright 需在子目录文件中重复声明，不能依赖根文件继承。

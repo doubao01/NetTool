@@ -124,8 +124,8 @@ public sealed class ColorService : IColorService
         var rgbMatch = RgbPattern.Match(text);
         if (rgbMatch.Success)
         {
-            var parts = SplitNumbers(rgbMatch.Groups[1].Value, 3, 4);
-            return FromRgb(ToByte(parts[0]), ToByte(parts[1]), ToByte(parts[2]));
+            var channels = ParseRgbChannels(rgbMatch.Groups[1].Value);
+            return FromRgb(channels[0], channels[1], channels[2]);
         }
 
         var hslMatch = HslPattern.Match(text);
@@ -151,8 +151,8 @@ public sealed class ColorService : IColorService
 
         if (text.Contains(','))
         {
-            var parts = SplitNumbers(text, 3, 4);
-            return FromRgb(ToByte(parts[0]), ToByte(parts[1]), ToByte(parts[2]));
+            var channels = ParseRgbChannels(text);
+            return FromRgb(channels[0], channels[1], channels[2]);
         }
 
         var named = NamedColors.TryGetValue(text, out var namedHex)
@@ -312,6 +312,27 @@ public sealed class ColorService : IColorService
                 throw new FormatException($"无法解析数值分量：{raw}。");
         }
         return values;
+    }
+
+    private static int[] ParseRgbChannels(string body)
+    {
+        var tokens = body.Split(new[] { ',', ' ', '/' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (tokens.Length is < 3 or > 4)
+            throw new FormatException("rgb() 需要 3 至 4 个数值分量。");
+
+        var channels = new int[3];
+        for (var i = 0; i < 3; i++)
+        {
+            var raw = tokens[i];
+            var isPercent = raw.EndsWith('%');
+            var text = isPercent ? raw[..^1] : raw;
+            if (!double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var value))
+                throw new FormatException($"无法解析 RGB 分量：{raw}。");
+            channels[i] = isPercent
+                ? (int)Math.Clamp(Math.Round(value * 255 / 100), 0, 255)
+                : (int)Math.Clamp(Math.Round(value), 0, 255);
+        }
+        return channels;
     }
 
     private static double NormalizeHue(double hue)
