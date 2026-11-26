@@ -155,7 +155,13 @@ public class SelfReflectionService : ISelfReflectionService
     {
         try
         {
-            var chatFunction = _kernel!.CreateFunctionFromPrompt(ReflectionPrompt);
+            var kernel = _kernel;
+            if (kernel is null)
+            {
+                return;
+            }
+
+            var chatFunction = kernel.CreateFunctionFromPrompt(ReflectionPrompt);
             var arguments = new KernelArguments
             {
                 ["taskDescription"] = reflection.TaskDescription,
@@ -165,7 +171,7 @@ public class SelfReflectionService : ISelfReflectionService
                 ["outcome"] = reflection.Outcome
             };
 
-            var analysisResult = await _kernel.InvokeAsync(chatFunction, arguments, cancellationToken);
+            var analysisResult = await kernel.InvokeAsync(chatFunction, arguments, cancellationToken);
             var analysisText = analysisResult.ToString();
 
             // 解析分析结果（简化处理，实际应该用 JSON 解析）

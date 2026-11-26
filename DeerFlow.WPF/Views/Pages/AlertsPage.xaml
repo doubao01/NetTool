@@ -1,0 +1,155 @@
+<UserControl x:Class="DeerFlow.WPF.Views.Pages.AlertsPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:services="clr-namespace:DeerFlow.WPF.Services">
+
+    <Grid Background="{StaticResource ContentBackground}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- 标题与操作 -->
+        <Border Grid.Row="0" Background="{StaticResource BackgroundColor}"
+                BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1"
+                Padding="20,14">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" Orientation="Horizontal">
+                    <TextBlock Text="🔔" FontSize="18" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <TextBlock Text="告警中心" FontSize="16" FontWeight="SemiBold"
+                               Foreground="{StaticResource TextColor}" VerticalAlignment="Center"/>
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal">
+                    <Button Content="✅ 确认选中" Style="{StaticResource SecondaryButton}"
+                            Command="{Binding AcknowledgeCommand}" Padding="12,6" Margin="0,0,8,0"/>
+                    <Button Content="🗑 删除选中" Style="{StaticResource SecondaryButton}"
+                            Command="{Binding DeleteCommand}" Padding="12,6" Margin="0,0,8,0"/>
+                    <Button Content="🧹 清除已确认" Style="{StaticResource SecondaryButton}"
+                            Command="{Binding ClearAcknowledgedCommand}" Padding="12,6" Margin="0,0,8,0"/>
+                    <Button Content="🔄 刷新" Style="{StaticResource PrimaryButton}"
+                            Command="{Binding RefreshCommand}" Padding="12,6"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- 统计条 -->
+        <Border Grid.Row="1" Background="{StaticResource CardBackground}"
+                CornerRadius="8" Padding="16" Margin="20,16,20,0">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" FontSize="13" Foreground="{StaticResource TextSecondaryColor}">
+                    <Run Text="告警总数 "/><Run Text="{Binding TotalCount, Mode=OneWay}"/>
+                    <Run Text="  |  待确认 "/><Run Text="{Binding UnacknowledgedCount, Mode=OneWay}"/>
+                </TextBlock>
+                <TextBlock Grid.Column="2" Text="{Binding StatusMessage}" FontSize="13"
+                           Foreground="{StaticResource AccentColor}"/>
+            </Grid>
+        </Border>
+
+        <!-- 告警列表 -->
+        <Grid Grid.Row="2" Margin="20,16,20,20">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="320"/>
+            </Grid.ColumnDefinitions>
+
+            <ListBox Grid.Column="0" ItemsSource="{Binding Alerts}"
+                     SelectedItem="{Binding SelectedAlert}"
+                     Background="Transparent" BorderThickness="0"
+                     ScrollViewer.VerticalScrollBarVisibility="Auto"
+                     VirtualizingStackPanel.IsVirtualizing="True"
+                     VirtualizingStackPanel.VirtualizationMode="Recycling">
+                <ListBox.ItemTemplate>
+                    <DataTemplate DataType="{x:Type services:Alert}">
+                        <Border Background="{StaticResource CardBackground}"
+                                CornerRadius="8" Padding="16" Margin="0,0,0,8">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="8"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+
+                                <Border Grid.Column="0" CornerRadius="4" Margin="0,0,12,0">
+                                    <Border.Style>
+                                        <Style TargetType="Border">
+                                            <Setter Property="Background" Value="{StaticResource TextMutedColor}"/>
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding Severity}" Value="Critical">
+                                                    <Setter Property="Background" Value="{StaticResource ErrorColor}"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Severity}" Value="High">
+                                                    <Setter Property="Background" Value="{StaticResource ErrorColor}"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Severity}" Value="Medium">
+                                                    <Setter Property="Background" Value="{StaticResource WarningColor}"/>
+                                                </DataTrigger>
+                                                <DataTrigger Binding="{Binding Severity}" Value="Low">
+                                                    <Setter Property="Background" Value="{StaticResource InfoColor}"/>
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </Border.Style>
+                                </Border>
+
+                                <StackPanel Grid.Column="1">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Grid.Column="0" Text="{Binding Title}" FontSize="14"
+                                                   FontWeight="SemiBold" Foreground="{StaticResource TextColor}"/>
+                                        <TextBlock Grid.Column="1" Text="{Binding CreatedAt, StringFormat={}{0:MM-dd HH:mm}}"
+                                                   FontSize="11" Foreground="{StaticResource TextMutedColor}"/>
+                                    </Grid>
+                                    <TextBlock Text="{Binding Message}" FontSize="12" TextWrapping="Wrap"
+                                               Foreground="{StaticResource TextSecondaryColor}" Margin="0,6,0,0"/>
+                                    <TextBlock FontSize="11" Margin="0,6,0,0"
+                                               Foreground="{StaticResource SuccessColor}"
+                                               Text="已确认"
+                                               Visibility="{Binding IsAcknowledged, Converter={StaticResource BooleanToVisibility}}"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+
+            <!-- 详情面板 -->
+            <Border Grid.Column="1" Background="{StaticResource CardBackground}"
+                    CornerRadius="8" Padding="16" Margin="12,0,0,0">
+                <ScrollViewer VerticalScrollBarVisibility="Auto">
+                    <StackPanel>
+                        <TextBlock Text="📋 告警详情" FontSize="15" FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextColor}" Margin="0,0,0,12"/>
+                        <TextBlock Text="{Binding SelectedAlert.Title, TargetNullValue=未选择告警}"
+                                   FontSize="14" FontWeight="Bold" TextWrapping="Wrap"
+                                   Foreground="{StaticResource TextColor}" Margin="0,0,0,8"/>
+                        <TextBlock Text="{Binding SelectedAlert.Message}" FontSize="12" TextWrapping="Wrap"
+                                   Foreground="{StaticResource TextSecondaryColor}" Margin="0,0,0,12"/>
+                        <TextBlock FontSize="12" Foreground="{StaticResource TextSecondaryColor}">
+                            <Run Text="类型："/><Run Text="{Binding SelectedAlert.Type, Mode=OneWay, TargetNullValue=-}"/>
+                        </TextBlock>
+                        <TextBlock FontSize="12" Foreground="{StaticResource TextSecondaryColor}" Margin="0,4,0,0">
+                            <Run Text="级别："/><Run Text="{Binding SelectedAlert.Severity, Mode=OneWay, TargetNullValue=-}"/>
+                        </TextBlock>
+                        <TextBlock FontSize="12" Foreground="{StaticResource TextSecondaryColor}" Margin="0,4,0,0">
+                            <Run Text="时间："/><Run Text="{Binding SelectedAlert.CreatedAt, Mode=OneWay, StringFormat={}{0:yyyy-MM-dd HH:mm:ss}, TargetNullValue=-}"/>
+                        </TextBlock>
+                    </StackPanel>
+                </ScrollViewer>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

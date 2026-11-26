@@ -138,8 +138,10 @@ public class MainViewModel : ViewModelBase
             ("对话", "💬", "Chat"),
             ("任务面板", "📋", "TaskPanel"),
             ("智能体编排", "🤖", "AgentOrchestration"),
+            ("沙箱管理", "🧪", "OpenSandbox"),
             ("记忆库", "🧠", "Memory"),
             ("技能商店", "🛠", "Skills"),
+            ("告警中心", "🔔", "Alerts"),
             ("IM接入", "💬", "IMSettings"),
             ("设置", "⚙", "Settings")
         };
@@ -231,8 +233,10 @@ public class MainViewModel : ViewModelBase
             "Chat" => App.Services.GetRequiredService<ChatViewModel>(),
             "TaskPanel" => App.Services.GetRequiredService<TaskPanelViewModel>(),
             "AgentOrchestration" => App.Services.GetRequiredService<AgentOrchestrationViewModel>(),
+            "OpenSandbox" => App.Services.GetRequiredService<OpenSandboxViewModel>(),
             "Memory" => App.Services.GetRequiredService<MemoryViewModel>(),
             "Skills" => App.Services.GetRequiredService<SkillsViewModel>(),
+            "Alerts" => App.Services.GetRequiredService<AlertsViewModel>(),
             "IMSettings" => App.Services.GetRequiredService<IMSettingsViewModel>(),
             "Settings" => App.Services.GetRequiredService<SettingsViewModel>(),
             _ => App.Services.GetRequiredService<HomeViewModel>()

@@ -5,6 +5,7 @@ using DeerFlow.WPF.Services.Filters;
 using DeerFlow.WPF.Services.Plugins;
 using DeerFlow.WPF.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 
 namespace DeerFlow.WPF;
@@ -83,8 +84,14 @@ public partial class App : Application
         // 6. 注册用户反馈服务
         services.AddSingleton<IFeedbackService, FeedbackService>();
 
-        // 7. 注册智能告警服务
-        services.AddSingleton<IAlertService, AlertService>();
+        // 7. 注册告警持久化与服务（LoggerFactory 由 AddKernel 隐含注册，缺失时回退空实现）
+        services.AddSingleton(_ => new AlertStore());
+        services.AddSingleton<IAlertService>(sp =>
+        {
+            var loggerFactory = sp.GetService<ILoggerFactory>()
+                ?? Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance;
+            return new AlertService(loggerFactory, sp.GetRequiredService<AlertStore>());
+        });
 
         // 8. 注册文档生成服务
         services.AddSingleton<IDocumentGenerationService, DocumentGenerationService>();
@@ -136,6 +143,7 @@ public partial class App : Application
         services.AddTransient<SettingsViewModel>();
         services.AddTransient<IMSettingsViewModel>();
         services.AddTransient<OpenSandboxViewModel>();
+        services.AddTransient<AlertsViewModel>();
 
         var serviceProvider = services.BuildServiceProvider();
 

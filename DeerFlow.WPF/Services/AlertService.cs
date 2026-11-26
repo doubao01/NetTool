@@ -98,6 +98,11 @@ public interface IAlertService
     void ClearAcknowledgedAlerts();
 
     /// <summary>
+    /// 删除单条告警
+    /// </summary>
+    void DeleteAlert(string alertId);
+
+    /// <summary>
     /// 检查负面反馈率并触发告警
     /// </summary>
     void CheckNegativeFeedbackRate(double negativeRate, int totalFeedbackCount);
@@ -121,6 +126,7 @@ public class AlertService : IAlertService
     private readonly ILogger _logger;
     private readonly ConcurrentDictionary<string, Alert> _alerts = new();
     private readonly object _lock = new();
+    private readonly AlertStore? _store;
 
     // 告警阈值配置
     private readonly double _negativeFeedbackThreshold = 0.3; // 负面反馈率超过 30% 触发告警
@@ -128,8 +134,32 @@ public class AlertService : IAlertService
     private readonly double _experimentAnomalyThreshold = 0.5; // 实验评分低于 50% 触发告警
 
     public AlertService(ILoggerFactory loggerFactory)
+        : this(loggerFactory, null)
+    {
+    }
+
+    /// <summary>
+    /// 允许注入持久化存储；为空时仅内存保存。
+    /// </summary>
+    public AlertService(ILoggerFactory loggerFactory, AlertStore? store)
     {
         _logger = loggerFactory.CreateLogger("AlertService");
+        _store = store;
+
+        if (_store is not null)
+        {
+            try
+            {
+                foreach (var alert in _store.Load())
+                {
+                    _alerts.TryAdd(alert.Id, alert);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "[AlertService] 加载历史告警失败");
+            }
+        }
     }
 
     /// <inheritdoc/>
@@ -147,6 +177,7 @@ public class AlertService : IAlertService
         };
 
         _alerts.TryAdd(alert.Id, alert);
+        TryPersist(alert);
 
         // 根据级别记录日志
         switch (severity)
@@ -192,6 +223,7 @@ public class AlertService : IAlertService
         if (_alerts.TryGetValue(alertId, out var alert))
         {
             alert.IsAcknowledged = true;
+            TryPersist(alert);
             _logger.LogInformation("[AlertService] 告警已确认：{AlertId}", alertId);
         }
     }
@@ -223,8 +255,43 @@ public class AlertService : IAlertService
         foreach (var id in toRemove)
         {
             _alerts.TryRemove(id, out _);
+            TryDelete(id);
         }
         _logger.LogInformation("[AlertService] 已清除 {Count} 条已确认告警", toRemove.Count);
+    }
+
+    /// <inheritdoc/>
+    public void DeleteAlert(string alertId)
+    {
+        if (_alerts.TryRemove(alertId, out _))
+        {
+            TryDelete(alertId);
+            _logger.LogInformation("[AlertService] 已删除告警：{AlertId}", alertId);
+        }
+    }
+
+    private void TryPersist(Alert alert)
+    {
+        try
+        {
+            _store?.Upsert(alert);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[AlertService] 持久化告警失败：{AlertId}", alert.Id);
+        }
+    }
+
+    private void TryDelete(string alertId)
+    {
+        try
+        {
+            _store?.Delete(alertId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "[AlertService] 删除持久化告警失败：{AlertId}", alertId);
+        }
     }
 
     /// <summary>

@@ -11,7 +11,9 @@
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
                 <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
 
             <!-- 欢迎区域 -->
@@ -80,8 +82,26 @@
             <local:HealthMonitorControl Grid.Row="2" Margin="0,0,0,24"
                                         DataContext="{Binding}"/>
 
+            <!-- 模式知识图谱 -->
+            <local:PatternGraphControl Grid.Row="3" Margin="0,0,0,24"
+                                       DataContext="{Binding}"/>
+
+            <!-- 模式统计与操作反馈 -->
+            <Border Grid.Row="4" Background="{StaticResource CardBackground}"
+                    CornerRadius="10" Padding="20" Margin="0,0,0,24"
+                    Visibility="{Binding HasPatternFeedback, Converter={StaticResource BooleanToVisibility}}">
+                <StackPanel>
+                    <TextBlock Text="📊 模式统计" FontSize="14" FontWeight="SemiBold"
+                               Foreground="{StaticResource TextColor}" Margin="0,0,0,6"/>
+                    <TextBlock Text="{Binding StatisticsText}" FontSize="13" TextWrapping="Wrap"
+                               Foreground="{StaticResource TextSecondaryColor}" Margin="0,0,0,6"/>
+                    <TextBlock Text="{Binding ActionStatus}" FontSize="13" TextWrapping="Wrap"
+                               Foreground="{StaticResource AccentColor}"/>
+                </StackPanel>
+            </Border>
+
             <!-- 最近任务 -->
-            <Border Grid.Row="3" Background="{StaticResource CardBackground}"
+            <Border Grid.Row="5" Background="{StaticResource CardBackground}"
                     CornerRadius="10" Padding="24">
                 <Grid>
                     <Grid.RowDefinitions>

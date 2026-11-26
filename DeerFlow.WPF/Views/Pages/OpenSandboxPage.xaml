@@ -1,0 +1,27 @@
+<UserControl x:Class="DeerFlow.WPF.Views.Pages.OpenSandboxPage"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:DeerFlow.WPF.Views.Controls">
+
+    <Grid Background="{StaticResource ContentBackground}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0" Background="{StaticResource BackgroundColor}"
+                BorderBrush="{StaticResource BorderColor}" BorderThickness="0,0,0,1"
+                Padding="20,14">
+            <StackPanel Orientation="Horizontal">
+                <TextBlock Text="🧪" FontSize="18" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                <TextBlock Text="沙箱管理" FontSize="16" FontWeight="SemiBold"
+                           Foreground="{StaticResource TextColor}" VerticalAlignment="Center"/>
+                <TextBlock Text=" - OpenSandbox 远程执行环境" FontSize="13"
+                           Foreground="{StaticResource TextSecondaryColor}"
+                           VerticalAlignment="Center" Margin="8,0,0,0"/>
+            </StackPanel>
+        </Border>
+
+        <controls:OpenSandboxControl Grid.Row="1" DataContext="{Binding}"/>
+    </Grid>
+</UserControl>

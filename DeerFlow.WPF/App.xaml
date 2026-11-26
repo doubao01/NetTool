@@ -13,6 +13,15 @@
             <!-- 布尔值到可见性转换器 -->
             <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
 
+            <!-- 布尔值到可见性转换器（简写键） -->
+            <converters:BooleanToVisibilityConverter x:Key="BooleanToVisibility"/>
+
+            <!-- 布尔值到可见性反相转换器 -->
+            <converters:InverseBooleanToVisibilityConverter x:Key="InverseBooleanToVisibility"/>
+
+            <!-- 非空字符串到可见性转换器 -->
+            <converters:StringToVisibilityConverter x:Key="StringToVisibility"/>
+
             <!-- 布尔值取反转换器 -->
             <local:InverseBooleanConverter x:Key="InverseBooleanConverter"/>
 

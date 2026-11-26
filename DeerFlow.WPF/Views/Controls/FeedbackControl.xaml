@@ -20,18 +20,18 @@
                 <Button x:Name="LikeButton" Content="👍 有帮助" 
                         Style="{StaticResource SecondaryButton}"
                         Padding="16,8" Margin="0,0,12,0"
-                        Click="LikeButton_Click"/>
+                        Command="{Binding LikeFeedbackCommand}"/>
                 <Button x:Name="DislikeButton" Content="👎 需改进" 
                         Style="{StaticResource SecondaryButton}"
                         Padding="16,8"
-                        Click="DislikeButton_Click"/>
+                        Command="{Binding DislikeFeedbackCommand}"/>
             </StackPanel>
 
-            <!-- 感谢提示（初始隐藏） -->
-            <TextBlock Grid.Row="2" x:Name="ThanksMessage" 
-                       Text="感谢您的反馈！" FontSize="13"
+            <!-- 反馈结果提示 -->
+            <TextBlock Grid.Row="2" x:Name="ThanksMessage"
+                       Text="{Binding FeedbackStatus}" FontSize="13"
                        Foreground="{StaticResource AccentColor}"
-                       Visibility="Collapsed"/>
+                       Visibility="{Binding FeedbackStatus, Converter={StaticResource StringToVisibility}}"/>
         </Grid>
     </Border>
 </UserControl>

@@ -2,7 +2,7 @@
 
 AI 桌面超级智能体 — 基于 WPF + MVVM 的智能体编排桌面应用，集成 AIO Sandbox 多窗口任务隔离和仿 Trae Solo 暗色主题 UI。
 
-![Version](https://img.shields.io/badge/version-1.3.0-blue)
+![Version](https://img.shields.io/badge/version-1.4.0-blue)
 ![.NET](https://img.shields.io/badge/.NET-10.0-purple)
 ![WPF](https://img.shields.io/badge/WPF-MVVM-orange)
 ![Build](https://img.shields.io/badge/build-passing-brightgreen)
@@ -14,6 +14,7 @@ AI 桌面超级智能体 — 基于 WPF + MVVM 的智能体编排桌面应用，
 | 模块 | 功能 | 技术实现 |
 |------|------|----------|
 | 💬 **智能对话** | SSE 流式聊天，支持取消生成 | IAsyncEnumerable + CancellationToken |
+| 👍 **回复反馈** | 每轮回复一键点赞/点踩，结果持久化 | FeedbackService + FeedbackControl |
 | 📋 **任务面板** | 多窗口独立进程隔离 | Process.Start + 文件系统沙箱 |
 | 🤖 **智能体编排** | LLM 驱动的多轮任务执行循环 | AgentLoop + FunctionCallContent 手动工具执行 |
 | 🧠 **长期记忆** | 事实库 / 用户画像 / 主动回忆 | 重要性评分 + 类型标签 |
@@ -22,6 +23,9 @@ AI 桌面超级智能体 — 基于 WPF + MVVM 的智能体编排桌面应用，
 | 🛡 **崩溃恢复** | 看门狗进程监控 | 3 秒检查 + 30 秒心跳 + 3 次重启 |
 | 🔬 **性能诊断** | 内存快照对比分析 | 50 MB 泄漏阈值自动告警 |
 | 🤖 **自我迭代** | 自动学习优化系统 | SelfReflection + PatternMiner + AutoEvolver |
+| 🕸 **模式图谱** | 首页可视化模式库，点击查看详情 | PatternGraphControl + Canvas 布局 |
+| 🧪 **沙箱管理** | OpenSandbox 远程环境创建/执行/销毁 | OpenSandboxViewModel + OpenSandboxControl |
+| 🔔 **告警中心** | 告警列表、确认、清除，SQLite 持久化 | AlertService + AlertStore |
 
 ## 智能体编排
 
@@ -135,7 +139,10 @@ DeerFlow.WPF/
 │   └── MemorySnapshotService.cs  # 内存诊断快照 + 泄漏检测
 ├── ViewModels/                 # 视图模型
 │   ├── MainViewModel.cs        # 主窗口（WeakReference 页面缓存）
-│   └── PageViewModels.cs       # 7 个子页面 ViewModel
+│   ├── HomeViewModel.cs        # 首页 + 模式统计/图谱
+│   ├── AlertsViewModel.cs      # 告警中心
+│   ├── OpenSandboxViewModel.cs # 沙箱管理
+│   └── PageViewModels.cs       # 其余页面 ViewModel
 ├── Views/
 │   ├── Controls/               # 可复用控件
 │   │   ├── TitleBarControl     # WindowChrome 自定义标题栏
@@ -146,8 +153,10 @@ DeerFlow.WPF/
 │   │   ├── ChatPage            # 对话列表 + 输入（VirtualizingStackPanel）
 │   │   ├── TaskPanelPage       # 任务创建表单 + 列表
 │   │   ├── AgentOrchestrationPage  # 工作流编排
+│   │   ├── OpenSandboxPage     # 沙箱管理
 │   │   ├── MemoryPage          # 记忆库搜索 + 列表
 │   │   ├── SkillsPage          # 技能卡片网格
+│   │   ├── AlertsPage          # 告警中心
 │   │   └── SettingsPage        # 配置表单
 │   └── Windows/
 │       └── TaskWindow          # 独立沙箱任务窗口
@@ -171,10 +180,10 @@ DeerFlow.WPF/
 ┌─────────────────────────────────────────────┐
 │                  MainWindow                   │
 │  ┌──────────┬──────────────────────────────┐ │
-│  │ Sidebar  │   ContentControl (7 pages)  │ │
+│  │ Sidebar  │   ContentControl (9 pages)  │ │
 │  │          │   Home / Chat / TaskPanel    │ │
-│  │          │   Agent / Memory / Skills    │ │
-│  │          │   Settings                  │ │
+│  │          │   Agent / Sandbox / Memory  │ │
+│  │          │   Skills / Alerts / Settings│ │
 │  ├──────────┴──────────────────────────────┤ │
 │  │              StatusBar                   │ │
 │  └─────────────────────────────────────────┘ │

@@ -69,6 +69,22 @@ public class ChatViewModel : ViewModelBase
     public RelayCommand LikeFeedbackCommand { get; }
     public RelayCommand DislikeFeedbackCommand { get; }
 
+    private bool _canSubmitFeedback;
+    /// <summary>是否已有一轮可评价的回复</summary>
+    public bool CanSubmitFeedback
+    {
+        get => _canSubmitFeedback;
+        set => SetProperty(ref _canSubmitFeedback, value);
+    }
+
+    private string _feedbackStatus = string.Empty;
+    /// <summary>反馈提交结果提示</summary>
+    public string FeedbackStatus
+    {
+        get => _feedbackStatus;
+        set => SetProperty(ref _feedbackStatus, value);
+    }
+
     public ChatViewModel(IApiService apiService, ITaskWindowManager taskManager, ILoggerService logger)
     {
         _apiService = apiService;
@@ -86,10 +102,15 @@ public class ChatViewModel : ViewModelBase
         _feedbackService = App.Services.GetService<IFeedbackService>();
 
         SendCommand = new RelayCommand(new Action(async () => await SendMessageAsync()), () => !IsSending && !string.IsNullOrWhiteSpace(InputText));
-        ClearChatCommand = new RelayCommand(_ => Messages.Clear());
+        ClearChatCommand = new RelayCommand(_ =>
+        {
+            Messages.Clear();
+            CanSubmitFeedback = false;
+            FeedbackStatus = string.Empty;
+        });
         StopGenerationCommand = new RelayCommand(new Action(CancelSend), () => IsSending);
-        LikeFeedbackCommand = new RelayCommand(_ => SubmitFeedbackAsync("Like"));
-        DislikeFeedbackCommand = new RelayCommand(_ => SubmitFeedbackAsync("Dislike"));
+        LikeFeedbackCommand = new RelayCommand(new Action(async () => await SubmitFeedbackAsync("Like")), () => CanSubmitFeedback);
+        DislikeFeedbackCommand = new RelayCommand(new Action(async () => await SubmitFeedbackAsync("Dislike")), () => CanSubmitFeedback);
 
         // 获取智能模式提示
         var welcomeMessage = GenerateWelcomeMessage();
@@ -266,6 +287,9 @@ public class ChatViewModel : ViewModelBase
         finally
         {
             IsSending = false;
+            CanSubmitFeedback = !string.IsNullOrWhiteSpace(assistantMessage.Content)
+                && !assistantMessage.Content.StartsWith("请求失败");
+            FeedbackStatus = string.Empty;
             _sendCts?.Dispose();
             _sendCts = null;
         }
@@ -335,6 +359,7 @@ public class ChatViewModel : ViewModelBase
         if (_feedbackService is null || string.IsNullOrEmpty(_currentTaskId))
         {
             _logger.Warn("反馈服务未启用或当前任务 ID 为空");
+            FeedbackStatus = "反馈服务未启用，无法提交";
             return;
         }
 
@@ -347,10 +372,13 @@ public class ChatViewModel : ViewModelBase
                 rating: rating,
                 comment: null);
 
+            CanSubmitFeedback = false;
+            FeedbackStatus = feedbackType == "Like" ? "已记录：有帮助" : "已记录：需改进";
             _logger.Info($"已提交{feedbackType}反馈");
         }
         catch (Exception ex)
         {
+            FeedbackStatus = $"提交反馈失败：{ex.Message}";
             _logger.Warn($"提交反馈失败：{ex.Message}");
         }
     }

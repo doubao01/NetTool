@@ -35,6 +35,29 @@
     <SolidColorBrush x:Key="TerminalBackground" Color="#0D0D12"/>
     <SolidColorBrush x:Key="TerminalText" Color="#00FF88"/>
 
+    <!-- 别名色（兼容旧引用） -->
+    <SolidColorBrush x:Key="PrimaryColor" Color="#6C5CE7"/>
+
+    <!-- 进度条样式 -->
+    <Style x:Key="ProgressBarStyle" TargetType="ProgressBar">
+        <Setter Property="Foreground" Value="{StaticResource AccentColor}"/>
+        <Setter Property="Background" Value="{StaticResource BackgroundColor}"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ProgressBar">
+                    <Grid>
+                        <Border Background="{TemplateBinding Background}" CornerRadius="3"/>
+                        <Border x:Name="PART_Indicator"
+                                Background="{TemplateBinding Foreground}"
+                                CornerRadius="3"
+                                HorizontalAlignment="Left"/>
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- 全局样式 -->
     <Style TargetType="TextBlock">
         <Setter Property="Foreground" Value="{StaticResource TextColor}"/>

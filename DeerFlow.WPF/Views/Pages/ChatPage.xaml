@@ -1,12 +1,14 @@
 <UserControl x:Class="DeerFlow.WPF.Views.Pages.ChatPage"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:models="clr-namespace:DeerFlow.WPF.Models">
+             xmlns:models="clr-namespace:DeerFlow.WPF.Models"
+             xmlns:controls="clr-namespace:DeerFlow.WPF.Views.Controls">
 
     <Grid Background="{StaticResource ContentBackground}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
         </Grid.RowDefinitions>
 
@@ -110,8 +112,14 @@
             </ListBox.ItemTemplate>
         </ListBox>
 
+        <!-- 回复反馈区域，生成完成后显示 -->
+        <controls:FeedbackControl Grid.Row="2"
+                                  DataContext="{Binding}"
+                                  Margin="20,0,20,8"
+                                  Visibility="{Binding CanSubmitFeedback, Converter={StaticResource BooleanToVisibility}}"/>
+
         <!-- 输入区域 -->
-        <Border Grid.Row="2" Background="{StaticResource BackgroundColor}"
+        <Border Grid.Row="3" Background="{StaticResource BackgroundColor}"
                 BorderBrush="{StaticResource BorderColor}" BorderThickness="0,1,0,0"
                 Padding="20">
             <Grid>

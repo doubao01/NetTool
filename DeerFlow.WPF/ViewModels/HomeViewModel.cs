@@ -66,6 +66,56 @@ public class HomeViewModel : ViewModelBase
 
     public ObservableCollection<TaskModel> RecentTasks { get; } = new();
 
+    /// <summary>当前展示的模式列表（供图谱控件使用）</summary>
+    public ObservableCollection<PatternItem> Patterns { get; } = new();
+
+    /// <summary>当前选中的模式</summary>
+    private PatternItem? _selectedPattern;
+    public PatternItem? SelectedPattern
+    {
+        get => _selectedPattern;
+        set
+        {
+            if (SetProperty(ref _selectedPattern, value))
+            {
+                ApplyPatternCommand.RaiseCanExecuteChanged();
+                ViewPatternDetailsCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    /// <summary>统计信息文本，空串表示无内容可展示</summary>
+    private string _statisticsText = string.Empty;
+    public string StatisticsText
+    {
+        get => _statisticsText;
+        set
+        {
+            if (SetProperty(ref _statisticsText, value))
+            {
+                OnPropertyChanged(nameof(HasPatternFeedback));
+            }
+        }
+    }
+
+    /// <summary>操作提示文本</summary>
+    private string _actionStatus = string.Empty;
+    public string ActionStatus
+    {
+        get => _actionStatus;
+        set
+        {
+            if (SetProperty(ref _actionStatus, value))
+            {
+                OnPropertyChanged(nameof(HasPatternFeedback));
+            }
+        }
+    }
+
+    /// <summary>是否存在模式统计或操作反馈可展示</summary>
+    public bool HasPatternFeedback =>
+        !string.IsNullOrWhiteSpace(StatisticsText) || !string.IsNullOrWhiteSpace(ActionStatus);
+
     public RelayCommand NewChatCommand { get; }
     public RelayCommand NewTaskCommand { get; }
     public RelayCommand OpenSkillsCommand { get; }
@@ -96,10 +146,10 @@ public class HomeViewModel : ViewModelBase
         NewTaskCommand = new RelayCommand(_ => _createTask?.Invoke());
         OpenSkillsCommand = new RelayCommand(_ => _navigateTo?.Invoke("Skills"));
         RefreshHealthCommand = new RelayCommand(_ => RefreshHealth());
-        RefreshGraphCommand = new RelayCommand(_ => RefreshHealth());
+        RefreshGraphCommand = new RelayCommand(_ => RefreshGraph());
         ShowStatisticsCommand = new RelayCommand(_ => ShowStatistics());
-        ApplyPatternCommand = new RelayCommand(_ => ApplyPattern());
-        ViewPatternDetailsCommand = new RelayCommand(_ => ViewPatternDetails());
+        ApplyPatternCommand = new RelayCommand(_ => ApplyPattern(), _ => SelectedPattern is not null);
+        ViewPatternDetailsCommand = new RelayCommand(_ => ViewPatternDetails(), _ => SelectedPattern is not null);
 
         RefreshRecentTasks();
         RefreshHealth();
@@ -124,6 +174,15 @@ public class HomeViewModel : ViewModelBase
                 var patternStats = _patternMiner.GetPatternStatistics();
                 PatternCount = (int)(patternStats.ContainsKey("TotalPatterns") 
                     ? patternStats["TotalPatterns"] : 0);
+            }
+
+            Patterns.Clear();
+            if (_patternMiner is not null)
+            {
+                foreach (var pattern in _patternMiner.GetPatterns(limit: 12))
+                {
+                    Patterns.Add(pattern);
+                }
             }
 
             if (_experienceStore is not null)
@@ -156,18 +215,71 @@ public class HomeViewModel : ViewModelBase
         }
     }
 
+    /// <summary>
+    /// 重新加载模式图谱数据
+    /// </summary>
+    private void RefreshGraph()
+    {
+        RefreshHealth();
+        ActionStatus = Patterns.Count == 0
+            ? "暂无模式数据，请先完成若干任务以积累经验"
+            : $"已加载 {Patterns.Count} 个模式";
+    }
+
     private void ShowStatistics()
     {
-        _logger.Info("显示统计信息 - 待实现对话框");
+        if (_patternMiner is null)
+        {
+            StatisticsText = "模式挖掘服务未启用";
+            return;
+        }
+
+        try
+        {
+            var stats = _patternMiner.GetPatternStatistics();
+            var total = stats.TryGetValue("TotalPatterns", out var t) ? t : 0;
+            var verified = stats.TryGetValue("VerifiedPatterns", out var v) ? v : 0;
+            var draft = stats.TryGetValue("DraftPatterns", out var d) ? d : 0;
+            var avgScore = stats.TryGetValue("AverageScore", out var a) && a is double avg
+                ? avg.ToString("P1")
+                : "0%";
+            var totalUsage = stats.TryGetValue("TotalUsageCount", out var u) ? u : 0;
+
+            StatisticsText =
+                $"模式总数 {total}，已验证 {verified}，草稿 {draft}；" +
+                $"平均评分 {avgScore}，累计使用 {totalUsage} 次。";
+        }
+        catch (Exception ex)
+        {
+            StatisticsText = $"统计失败：{ex.Message}";
+            _logger.Warn($"显示模式统计失败：{ex.Message}");
+        }
     }
 
     private void ApplyPattern()
     {
-        _logger.Info("应用模式 - 待实现对话框");
+        if (SelectedPattern is null)
+        {
+            ActionStatus = "请先在图谱中选择一个模式";
+            return;
+        }
+
+        ActionStatus = $"已选用模式「{SelectedPattern.Name}」，将在后续对话中优先参考";
+        _logger.Info($"应用模式：{SelectedPattern.Name}");
     }
 
     private void ViewPatternDetails()
     {
-        _logger.Info("查看模式详情 - 待实现对话框");
+        if (SelectedPattern is null)
+        {
+            ActionStatus = "请先在图谱中选择一个模式";
+            return;
+        }
+
+        var pattern = SelectedPattern;
+        var steps = pattern.Steps.Count > 0 ? string.Join(" → ", pattern.Steps) : "（无步骤记录）";
+        ActionStatus =
+            $"「{pattern.Name}」类别 {pattern.Category}，评分 {pattern.Score:P1}，" +
+            $"使用 {pattern.UsageCount} 次；步骤：{steps}";
     }
 }

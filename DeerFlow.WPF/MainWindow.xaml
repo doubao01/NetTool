@@ -70,11 +70,17 @@
                                         <DataTemplate DataType="{x:Type vm:AgentOrchestrationViewModel}">
                                             <pages:AgentOrchestrationPage/>
                                         </DataTemplate>
+                                        <DataTemplate DataType="{x:Type vm:OpenSandboxViewModel}">
+                                            <pages:OpenSandboxPage/>
+                                        </DataTemplate>
                                         <DataTemplate DataType="{x:Type vm:MemoryViewModel}">
                                             <pages:MemoryPage/>
                                         </DataTemplate>
                                         <DataTemplate DataType="{x:Type vm:SkillsViewModel}">
                                             <pages:SkillsPage/>
+                                        </DataTemplate>
+                                        <DataTemplate DataType="{x:Type vm:AlertsViewModel}">
+                                            <pages:AlertsPage/>
                                         </DataTemplate>
                                         <DataTemplate DataType="{x:Type vm:SettingsViewModel}">
                                             <pages:SettingsPage/>
