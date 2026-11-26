@@ -49,7 +49,8 @@ public interface IExperienceMemoryStore
 
 /// <summary>
 /// 经验记忆存储服务 - 持久化存储经验和模式。
-/// 数据库采用 WAL 模式并复用连接，避免并发访问时的锁冲突。
+/// 数据库采用 WAL 模式，每次操作使用独立连接，由连接池复用；
+/// 写操作串行化，读操作依赖 WAL 快照并发执行，避免共享连接跨线程访问。
 /// </summary>
 public class ExperienceMemoryStore : IExperienceMemoryStore, IDisposable
 {
@@ -57,9 +58,9 @@ public class ExperienceMemoryStore : IExperienceMemoryStore, IDisposable
     private readonly ILogger _logger;
     private readonly ConcurrentDictionary<string, ExperienceMemoryItem> _cache = new();
     private readonly SemaphoreSlim _writeLock = new(1, 1);
-    private SqliteConnection? _connection;
-    private bool _disposed;
+    private volatile bool _disposed;
     private const string DbFileName = "experiences.db";
+    private const int BusyTimeoutSeconds = 30;
 
     public ExperienceMemoryStore(ILoggerFactory loggerFactory)
         : this(loggerFactory, null)
@@ -94,7 +95,11 @@ public class ExperienceMemoryStore : IExperienceMemoryStore, IDisposable
             dbFilePath = fullPath;
         }
 
-        _connectionString = new SqliteConnectionStringBuilder { DataSource = dbFilePath }.ToString();
+        _connectionString = new SqliteConnectionStringBuilder
+        {
+            DataSource = dbFilePath,
+            DefaultTimeout = BusyTimeoutSeconds
+        }.ToString();
         InitializeDatabase();
     }
 
@@ -106,7 +111,7 @@ public class ExperienceMemoryStore : IExperienceMemoryStore, IDisposable
         await _writeLock.WaitAsync(cancellationToken);
         try
         {
-            var connection = GetConnection();
+            await using var connection = OpenConnection();
 
             await using var command = connection.CreateCommand();
             command.CommandText = @"
@@ -146,7 +151,7 @@ public class ExperienceMemoryStore : IExperienceMemoryStore, IDisposable
         }
         finally
         {
-            _writeLock.Release();
+            ReleaseWriteLock();
         }
     }
 
@@ -163,7 +168,7 @@ public class ExperienceMemoryStore : IExperienceMemoryStore, IDisposable
 
         try
         {
-            var connection = GetConnection();
+            using var connection = OpenConnection();
 
             using var command = connection.CreateCommand();
             command.CommandText = @"
@@ -214,7 +219,7 @@ public class ExperienceMemoryStore : IExperienceMemoryStore, IDisposable
 
         try
         {
-            var connection = GetConnection();
+            using var connection = OpenConnection();
 
             using var command = connection.CreateCommand();
             command.CommandText = "SELECT * FROM Experiences WHERE Id = @Id";
@@ -239,28 +244,102 @@ public class ExperienceMemoryStore : IExperienceMemoryStore, IDisposable
     /// <inheritdoc/>
     public void UpdateConfidence(string id, bool positive)
     {
-        var experience = GetExperience(id);
-        if (experience is null)
+        if (_disposed)
         {
             return;
         }
 
-        if (positive)
+        try
         {
-            experience.ValidationCount++;
-            experience.Confidence = Math.Min(1.0, experience.ValidationCount / 10.0);
+            _writeLock.Wait();
         }
-        else
+        catch (ObjectDisposedException)
         {
-            experience.Confidence = Math.Max(0.0, experience.Confidence - 0.1);
+            return;
         }
 
-        _cache.AddOrUpdate(id, experience, (_, _) => experience);
-        PersistConfidence(experience);
+        try
+        {
+            var source = LoadFromDatabase(id);
+            if (source is null)
+            {
+                return;
+            }
 
-        _logger.LogInformation(
-            "[ExperienceMemory] 更新置信度：{Id} - {Confidence}",
-            id, experience.Confidence);
+            var updated = CloneWithNewConfidence(source, positive);
+            PersistConfidenceLocked(updated);
+            _cache[id] = updated;
+
+            _logger.LogInformation(
+                "[ExperienceMemory] 更新置信度：{Id} - {Confidence}",
+                id, updated.Confidence);
+        }
+        finally
+        {
+            ReleaseWriteLock();
+        }
+    }
+
+    private void ReleaseWriteLock()
+    {
+        try
+        {
+            _writeLock.Release();
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+    }
+
+    private ExperienceMemoryItem? LoadFromDatabase(string id)
+    {
+        try
+        {
+            using var connection = OpenConnection();
+
+            using var command = connection.CreateCommand();
+            command.CommandText = "SELECT * FROM Experiences WHERE Id = @Id";
+            command.Parameters.AddWithValue("@Id", id);
+
+            using var reader = command.ExecuteReader();
+            if (reader.Read())
+            {
+                return ReadExperience(reader);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "[ExperienceMemory] 读取经验失败：{Id}", id);
+        }
+
+        return null;
+    }
+
+    private static ExperienceMemoryItem CloneWithNewConfidence(ExperienceMemoryItem source, bool positive)
+    {
+        var validationCount = positive ? source.ValidationCount + 1 : source.ValidationCount;
+        var confidence = positive
+            ? Math.Min(1.0, validationCount / 10.0)
+            : Math.Max(0.0, source.Confidence - 0.1);
+
+        return new ExperienceMemoryItem
+        {
+            Id = source.Id,
+            Content = source.Content,
+            Type = source.Type,
+            Tags = new List<string>(source.Tags),
+            Importance = source.Importance,
+            CreatedAt = source.CreatedAt,
+            LastAccessedAt = source.LastAccessedAt,
+            ExperienceType = source.ExperienceType,
+            RelatedTaskId = source.RelatedTaskId,
+            Summary = source.Summary,
+            DetailedContent = source.DetailedContent,
+            ActionableTips = new List<string>(source.ActionableTips),
+            Confidence = confidence,
+            ValidationCount = validationCount,
+            IsApplied = source.IsApplied
+        };
     }
 
     /// <inheritdoc/>
@@ -288,51 +367,40 @@ public class ExperienceMemoryStore : IExperienceMemoryStore, IDisposable
 
     #region Private Methods
 
-    private SqliteConnection GetConnection()
+    private SqliteConnection OpenConnection()
     {
-        if (_connection is null)
-        {
-            _connection = new SqliteConnection(_connectionString);
-            _connection.Open();
-        }
+        if (_disposed) throw new ObjectDisposedException(nameof(ExperienceMemoryStore));
 
-        return _connection;
+        var connection = new SqliteConnection(_connectionString);
+        connection.Open();
+
+        using var pragma = connection.CreateCommand();
+        pragma.CommandText = $"PRAGMA busy_timeout={BusyTimeoutSeconds * 1000};";
+        pragma.ExecuteNonQuery();
+
+        return connection;
     }
 
     /// <summary>
     /// 将置信度与验证次数写回数据库，保证重启后不丢失。
+    /// 调用方必须已持有写锁。
     /// </summary>
-    private void PersistConfidence(ExperienceMemoryItem experience)
+    private void PersistConfidenceLocked(ExperienceMemoryItem experience)
     {
-        try
-        {
-            _writeLock.Wait();
-            try
-            {
-                var connection = GetConnection();
-                using var command = connection.CreateCommand();
-                command.CommandText = @"
-                    UPDATE Experiences
-                    SET Confidence = @Confidence,
-                        ValidationCount = @ValidationCount,
-                        LastAccessedAt = @LastAccessedAt
-                    WHERE Id = @Id";
+        using var connection = OpenConnection();
+        using var command = connection.CreateCommand();
+        command.CommandText = @"
+            UPDATE Experiences
+            SET Confidence = @Confidence,
+                ValidationCount = @ValidationCount,
+                LastAccessedAt = @LastAccessedAt
+            WHERE Id = @Id";
 
-                command.Parameters.AddWithValue("@Confidence", experience.Confidence);
-                command.Parameters.AddWithValue("@ValidationCount", experience.ValidationCount);
-                command.Parameters.AddWithValue("@LastAccessedAt", DateTime.Now);
-                command.Parameters.AddWithValue("@Id", experience.Id);
-                command.ExecuteNonQuery();
-            }
-            finally
-            {
-                _writeLock.Release();
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "[ExperienceMemory] 持久化置信度失败：{Id}", experience.Id);
-        }
+        command.Parameters.AddWithValue("@Confidence", experience.Confidence);
+        command.Parameters.AddWithValue("@ValidationCount", experience.ValidationCount);
+        command.Parameters.AddWithValue("@LastAccessedAt", DateTime.Now);
+        command.Parameters.AddWithValue("@Id", experience.Id);
+        command.ExecuteNonQuery();
     }
 
     /// <summary>
@@ -347,10 +415,28 @@ public class ExperienceMemoryStore : IExperienceMemoryStore, IDisposable
 
         _ = Task.Run(() =>
         {
-            _writeLock.Wait();
+            if (_disposed)
+            {
+                return;
+            }
+
             try
             {
-                var connection = GetConnection();
+                _writeLock.Wait();
+            }
+            catch (ObjectDisposedException)
+            {
+                return;
+            }
+
+            try
+            {
+                if (_disposed)
+                {
+                    return;
+                }
+
+                using var connection = OpenConnection();
                 using var transaction = connection.BeginTransaction();
                 using var command = connection.CreateCommand();
                 command.Transaction = transaction;
@@ -373,7 +459,7 @@ public class ExperienceMemoryStore : IExperienceMemoryStore, IDisposable
             }
             finally
             {
-                _writeLock.Release();
+                ReleaseWriteLock();
             }
         });
     }
@@ -382,12 +468,12 @@ public class ExperienceMemoryStore : IExperienceMemoryStore, IDisposable
     {
         try
         {
-            var connection = GetConnection();
+            using var connection = OpenConnection();
 
             // 启用 WAL 模式，提升并发读写能力并降低锁冲突
             using (var pragma = connection.CreateCommand())
             {
-                pragma.CommandText = "PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL; PRAGMA busy_timeout=5000;";
+                pragma.CommandText = "PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;";
                 pragma.ExecuteNonQuery();
             }
 
@@ -440,14 +526,16 @@ public class ExperienceMemoryStore : IExperienceMemoryStore, IDisposable
             Id = reader.GetString(reader.GetOrdinal("Id")),
             Content = reader.GetString(reader.GetOrdinal("Content")),
             Type = reader.IsDBNull(reader.GetOrdinal("Type"))
-                ? null
+                ? string.Empty
                 : reader.GetString(reader.GetOrdinal("Type")),
-            Tags = reader.GetString(reader.GetOrdinal("Tags")).Split(',').ToList(),
+            Tags = reader.IsDBNull(reader.GetOrdinal("Tags"))
+                ? new List<string>()
+                : reader.GetString(reader.GetOrdinal("Tags")).Split(',', StringSplitOptions.RemoveEmptyEntries).ToList(),
             Importance = (int)reader.GetDouble(reader.GetOrdinal("Importance")),
             ExperienceType = reader.GetString(reader.GetOrdinal("ExperienceType")),
-            RelatedTaskId = reader.GetString(reader.GetOrdinal("RelatedTaskId")),
-            Summary = reader.GetString(reader.GetOrdinal("Summary")),
-            DetailedContent = reader.GetString(reader.GetOrdinal("DetailedContent")),
+            RelatedTaskId = ReadNullableString(reader, "RelatedTaskId"),
+            Summary = ReadNullableString(reader, "Summary"),
+            DetailedContent = ReadNullableString(reader, "DetailedContent"),
             Confidence = reader.GetDouble(reader.GetOrdinal("Confidence")),
             ValidationCount = reader.GetInt32(reader.GetOrdinal("ValidationCount")),
             IsApplied = reader.GetInt32(reader.GetOrdinal("IsApplied")) == 1,
@@ -458,6 +546,12 @@ public class ExperienceMemoryStore : IExperienceMemoryStore, IDisposable
         };
     }
 
+    private static string ReadNullableString(SqliteDataReader reader, string column)
+    {
+        var ordinal = reader.GetOrdinal(column);
+        return reader.IsDBNull(ordinal) ? string.Empty : reader.GetString(ordinal);
+    }
+
     public void Dispose()
     {
         if (_disposed)
@@ -466,8 +560,19 @@ public class ExperienceMemoryStore : IExperienceMemoryStore, IDisposable
         }
 
         _disposed = true;
-        _connection?.Dispose();
-        _connection = null;
+
+        // 等待进行中的写操作结束，避免异步任务在同步原语释放后继续执行
+        try
+        {
+            if (_writeLock.Wait(TimeSpan.FromSeconds(BusyTimeoutSeconds)))
+            {
+                _writeLock.Release();
+            }
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+
         _writeLock.Dispose();
     }
 
