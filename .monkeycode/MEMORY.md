@@ -91,3 +91,11 @@ This file records user instructions, preferences, and teachings for reference in
   - CI 工作流 `.github/workflows/dotnet-ci.yml` 的 DeerFlow 作业用 `--filter "Category!=Integration"` 排除集成测试，测试类需显式标注 `[Trait("Category", "Integration")]` 才会被排除，否则会随普通用例并行执行。
   - 依赖真实 SQLite 文件的测试必须各自使用独立临时库路径，共用 `%LocalAppData%/DeerFlow.WPF/experiences.db` 在并行测试下会报 `SQLite Error 5: database is locked`。
   - 本机验证 DeerFlow 测试项目需加 `-p:EnableWindowsTargeting=true`：`dotnet build DeerFlow.WPF/Tests/DeerFlow.WPF.Tests.csproj -c Debug -p:EnableWindowsTargeting=true`（Linux 上仅能编译，无法运行 Windows 目标测试）。
+
+[Project Knowledge Summary]
+- Date: 2026-11-26
+- Context: Discovered by Agent while hardening ExperienceMemoryStore concurrency
+- Category: Build Methods
+- Instructions:
+  - 排查构建警告时先按文件聚合，避免被无关文件的既有警告干扰：`dotnet build ... 2>&1 | grep -oE "[A-Za-z0-9_.]+\.cs\([0-9]+,[0-9]+\): warning [A-Za-z0-9]+" | sed -E 's/\([0-9]+,[0-9]+\)//' | sort | uniq -c | sort -rn`。
+  - DeerFlow 测试项目现有 xUnit1031（阻塞调用）、CS4014、SYSLIB0060 等警告来自别的文件，属既有基线，新增代码保持零警告即可。
