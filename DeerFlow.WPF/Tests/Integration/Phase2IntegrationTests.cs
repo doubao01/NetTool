@@ -10,6 +10,7 @@ namespace DeerFlow.WPF.Tests.Integration;
 /// <summary>
 /// 集成测试 - 测试 Phase 2 新增服务的协同工作
 /// </summary>
+[Trait("Category", "Integration")]
 public class Phase2IntegrationTests : IClassFixture<IntegrationTestFixture>
 {
     private readonly IntegrationTestFixture _fixture;
@@ -232,7 +233,12 @@ public class IntegrationTestFixture
         services.AddSingleton<IDocumentGenerationService, DocumentGenerationService>();
         services.AddSingleton<ISelfReflectionService, SelfReflectionService>();
         services.AddSingleton<IPatternMiner, PatternMiner>();
-        services.AddSingleton<IExperienceMemoryStore, ExperienceMemoryStore>();
+        services.AddSingleton<IExperienceMemoryStore>(_ => new ExperienceMemoryStore(
+            Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance,
+            System.IO.Path.Combine(
+                System.IO.Path.GetTempPath(),
+                "DeerFlowTests",
+                System.Guid.NewGuid().ToString("N") + ".db")));
         services.AddSingleton<IAutoEvolver, AutoEvolver>();
 
         Services = services.BuildServiceProvider();

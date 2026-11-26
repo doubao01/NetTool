@@ -82,3 +82,12 @@ This file records user instructions, preferences, and teachings for reference in
 - Instructions:
   - 仓库已迁移至 `https://github.com/doubao01/NetTool.git`，旧的 `SamHub1991/NetTool` 仅靠重定向生效；origin 已指向新地址。
   - 文档中的仓库链接统一使用 `doubao01/NetTool`，克隆命令后进入的子目录仍是 `NetTool/SystemToolkit`。
+
+[Project Knowledge Summary]
+- Date: 2026-11-26
+- Context: Discovered by Agent while diagnosing a failed GitHub Actions run
+- Category: Testing Methods
+- Instructions:
+  - CI 工作流 `.github/workflows/dotnet-ci.yml` 的 DeerFlow 作业用 `--filter "Category!=Integration"` 排除集成测试，测试类需显式标注 `[Trait("Category", "Integration")]` 才会被排除，否则会随普通用例并行执行。
+  - 依赖真实 SQLite 文件的测试必须各自使用独立临时库路径，共用 `%LocalAppData%/DeerFlow.WPF/experiences.db` 在并行测试下会报 `SQLite Error 5: database is locked`。
+  - 本机验证 DeerFlow 测试项目需加 `-p:EnableWindowsTargeting=true`：`dotnet build DeerFlow.WPF/Tests/DeerFlow.WPF.Tests.csproj -c Debug -p:EnableWindowsTargeting=true`（Linux 上仅能编译，无法运行 Windows 目标测试）。

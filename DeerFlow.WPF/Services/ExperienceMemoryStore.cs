@@ -62,16 +62,39 @@ public class ExperienceMemoryStore : IExperienceMemoryStore, IDisposable
     private const string DbFileName = "experiences.db";
 
     public ExperienceMemoryStore(ILoggerFactory loggerFactory)
+        : this(loggerFactory, null)
+    {
+    }
+
+    /// <summary>
+    /// 允许指定数据库文件路径，便于测试隔离与多实例部署。
+    /// </summary>
+    public ExperienceMemoryStore(ILoggerFactory loggerFactory, string? dbFilePath)
     {
         _logger = loggerFactory.CreateLogger("ExperienceMemory");
 
-        // 数据目录优先使用可写的 LocalApplicationData，避免安装目录只读导致失败
-        var dataDir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "DeerFlow.WPF");
-        Directory.CreateDirectory(dataDir);
+        if (string.IsNullOrWhiteSpace(dbFilePath))
+        {
+            // 数据目录优先使用可写的 LocalApplicationData，避免安装目录只读导致失败
+            var dataDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "DeerFlow.WPF");
+            Directory.CreateDirectory(dataDir);
+            dbFilePath = Path.Combine(dataDir, DbFileName);
+        }
+        else
+        {
+            var fullPath = Path.GetFullPath(dbFilePath);
+            var directory = Path.GetDirectoryName(fullPath);
+            if (!string.IsNullOrEmpty(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
 
-        _connectionString = $"Data Source={Path.Combine(dataDir, DbFileName)}";
+            dbFilePath = fullPath;
+        }
+
+        _connectionString = new SqliteConnectionStringBuilder { DataSource = dbFilePath }.ToString();
         InitializeDatabase();
     }
 

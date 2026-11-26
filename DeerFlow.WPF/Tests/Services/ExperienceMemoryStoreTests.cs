@@ -1,3 +1,4 @@
+using System.IO;
 using DeerFlow.WPF.Models;
 using DeerFlow.WPF.Services;
 using Microsoft.Extensions.Logging;
@@ -14,7 +15,8 @@ public class ExperienceMemoryStoreTests
         loggerFactory
             .Setup(f => f.CreateLogger(It.IsAny<string>()))
             .Returns(new Mock<ILogger>().Object);
-        return new ExperienceMemoryStore(loggerFactory.Object);
+        var dbPath = Path.Combine(Path.GetTempPath(), "DeerFlowTests", Guid.NewGuid().ToString("N") + ".db");
+        return new ExperienceMemoryStore(loggerFactory.Object, dbPath);
     }
 
     private static ExperienceMemoryItem CreateItem(string content) => new()

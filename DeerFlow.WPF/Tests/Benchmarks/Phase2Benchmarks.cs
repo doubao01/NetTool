@@ -26,7 +26,9 @@ public class Phase2Benchmarks
         services.AddSingleton<IDocumentGenerationService, DocumentGenerationService>();
         services.AddSingleton<ISelfReflectionService, SelfReflectionService>();
         services.AddSingleton<IPatternMiner, PatternMiner>();
-        services.AddSingleton<IExperienceMemoryStore, ExperienceMemoryStore>();
+        services.AddSingleton<IExperienceMemoryStore>(_ => new ExperienceMemoryStore(
+            Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance,
+            Path.Combine(Path.GetTempPath(), "DeerFlowTests", Guid.NewGuid().ToString("N") + ".db")));
 
         var provider = services.BuildServiceProvider();
         _feedbackService = provider.GetRequiredService<IFeedbackService>();
