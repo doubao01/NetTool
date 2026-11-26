@@ -190,9 +190,9 @@ dotnet test Tests/DeerFlow.WPF.Tests.csproj
 |------|--------------|--------------|------|
 | **源文件** | App/Core/Tests 三项目 | DeerFlow.WPF 单项目 | - |
 | **代码行数** | 以仓库为准 | 以仓库为准 | - |
-| **测试用例** | 以 `dotnet test` 为准 | 以 `dotnet test` 为准 | - |
+| **测试用例** | 396 个 | 204 个 | 600 个 |
 | **功能入口** | 30 个功能页面 | 8 类服务 + 智能体循环 | - |
-| **文档** | 10+ | 10+ | 20+ |
+| **文档** | 10+ | 8+ | 18+ |
 
 > 统计口径：源文件不含测试项目与 `bin/obj` 生成物；测试用例按 `[Fact]`/`[Theory]` 方法计数。
 
@@ -265,7 +265,7 @@ NetTool/
 │   │   └── DocumentGenerationService/ # 文档生成
 │   ├── ViewModels/                  # 视图模型
 │   ├── Views/                       # 视图和控件
-│   ├── Tests/                       # 测试项目 (171 个测试)
+│   ├── Tests/                       # 测试项目 (204 个测试)
 │   └── README.md                    # 详细文档
 │
 ├── .github/workflows/               # CI/CD 配置
@@ -284,7 +284,7 @@ NetTool/
 
 ### DeerFlow.WPF
 - ✅ **自我迭代系统** - 完整的 AI 自主学习能力闭环
-- ✅ **171 个测试用例** - 覆盖核心服务与集成场景
+- ✅ **204 个测试用例** - 覆盖核心服务与集成场景
 - ✅ **性能优异** - 大部分指标达到或优于目标值
 - ✅ **图形化知识图谱** - 直观展示知识结构
 - ✅ **智能告警** - 多层防护机制
@@ -339,8 +339,8 @@ NetTool/
 
 ## 📧 联系方式
 
-- **项目主页**: [GitHub](https://github.com/SamHub1991/NetTool)
-- **问题反馈**: [Issues](https://github.com/SamHub1991/NetTool/issues)
+- **项目主页**: [GitHub](https://github.com/doubao01/NetTool)
+- **问题反馈**: [Issues](https://github.com/doubao01/NetTool/issues)
 
 ---
 

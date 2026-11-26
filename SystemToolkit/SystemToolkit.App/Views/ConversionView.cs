@@ -152,7 +152,7 @@ public class ConversionView : UserControl
 
         var bar = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 8) };
         bar.Children.Add(new TextBlock { Text = "内容:", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) });
-        _qrInput = new TextBox { Width = 420, Text = "https://github.com/SamHub1991/NetTool", Margin = new Thickness(0, 0, 8, 0) };
+        _qrInput = new TextBox { Width = 420, Text = "https://github.com/doubao01/NetTool", Margin = new Thickness(0, 0, 8, 0) };
         bar.Children.Add(_qrInput);
         bar.Children.Add(new TextBlock { Text = "像素倍率:", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) });
         _qrPixels = new TextBox { Width = 50, Text = "8", Margin = new Thickness(0, 0, 8, 0) };

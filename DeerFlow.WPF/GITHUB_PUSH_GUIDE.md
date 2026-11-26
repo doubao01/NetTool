@@ -135,7 +135,7 @@ Performance:
 推送到 GitHub 后，可以创建 Release：
 
 ### 使用 GitHub Web UI
-1. 访问 https://github.com/SamHub1991/NetTool
+1. 访问 https://github.com/doubao01/NetTool
 2. 点击 "Releases" → "Create a new release"
 3. Tag version: `v1.3.0`
 4. Release title: `Phase 2 - Self-Improvement System`
@@ -187,7 +187,7 @@ ssh -T git@github.com
 git remote -v
 
 # 如有错误，重新设置
-git remote set-url origin git@github.com:SamHub1991/NetTool.git
+git remote set-url origin git@github.com:doubao01/NetTool.git
 ```
 
 ### 问题 3: blocked by branch protection

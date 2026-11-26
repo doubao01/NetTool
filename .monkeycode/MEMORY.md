@@ -36,7 +36,7 @@ This file records user instructions, preferences, and teachings for reference in
 - Instructions:
   - SystemToolkit 项目（Core/App/Tests）目标框架为 `net10.0-windows`，`SystemToolkit/Directory.Build.props` 已固化 `EnableWindowsTargeting=true`，非 Windows 平台直接构建/测试即可，无需额外传参。
   - 构建：`dotnet build SystemToolkit/SystemToolkit.sln -c Debug`（当前 0 警告 0 错误，StyleCop.Analyzers 已移除）。
-  - 测试：`dotnet test SystemToolkit/SystemToolkit.Tests/SystemToolkit.Tests.csproj -c Debug`（xunit + FluentAssertions + Moq，313 用例；离线工具箱目录测试 `Catalog_ContainsExactlyFiftyFourUniqueToolsWithChineseMetadata` 会逐工具执行 Example，新工具示例必须可确定性运行）。
+  - 测试：`dotnet test SystemToolkit/SystemToolkit.Tests/SystemToolkit.Tests.csproj -c Debug`（xunit + FluentAssertions + Moq，396 用例；离线工具箱目录测试 `Catalog_ContainsExactlyFiftyFourUniqueToolsWithChineseMetadata` 会逐工具执行 Example，新工具示例必须可确定性运行）。
   - CI 在 `windows-latest` 上运行，会执行全部测试；Linux 上仅用于本地快速验证。
 
 [Project Knowledge Summary]
@@ -73,3 +73,12 @@ This file records user instructions, preferences, and teachings for reference in
   - 编译：`dotnet build SystemToolkit/SystemToolkit.sln -c Debug`；测试：`dotnet test SystemToolkit/SystemToolkit.Tests/SystemToolkit.Tests.csproj -c Debug`。v1.4 完成后为 0 警告 0 错误、396 用例全绿。
   - Core 新增第三方依赖：Markdig 1.6.0、YamlDotNet 18.1.0、QRCoder 1.9.0，首次需联网还原。
   - 新增功能页同步点共四处：Core 服务与模型、App 视图、`App.xaml.cs` 的 DI 注册、`MainViewModel` 菜单与命令面板关键词；另需更新两份 README 的功能计数。
+  - `SystemToolkit/Directory.Build.props` 会屏蔽仓库根同名文件（MSBuild 只自动导入最近一层），因此 Company/Product/Copyright 需在子目录文件中重复声明，不能依赖根文件继承。
+
+[Project Knowledge Summary]
+- Date: 2026-11-26
+- Context: Discovered by Agent while syncing docs with the migrated GitHub repository
+- Category: Operations & Deployment
+- Instructions:
+  - 仓库已迁移至 `https://github.com/doubao01/NetTool.git`，旧的 `SamHub1991/NetTool` 仅靠重定向生效；origin 已指向新地址。
+  - 文档中的仓库链接统一使用 `doubao01/NetTool`，克隆命令后进入的子目录仍是 `NetTool/SystemToolkit`。

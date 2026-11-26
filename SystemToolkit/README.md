@@ -76,7 +76,7 @@
 
 ```bash
 # 克隆项目
-git clone https://github.com/yourusername/SystemToolkit.git
+git clone https://github.com/doubao01/NetTool.git
 
 # 进入项目目录
 cd SystemToolkit
@@ -173,8 +173,8 @@ MIT License - 详见 [LICENSE](LICENSE) 文件
 
 ## 📧 联系
 
-- **项目主页**: [GitHub](https://github.com/yourusername/SystemToolkit)
-- **问题反馈**: [Issues](https://github.com/yourusername/SystemToolkit/issues)
+- **项目主页**: [GitHub](https://github.com/doubao01/NetTool)
+- **问题反馈**: [Issues](https://github.com/doubao01/NetTool/issues)
 
 ---
 

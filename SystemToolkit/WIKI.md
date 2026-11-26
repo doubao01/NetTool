@@ -1,6 +1,6 @@
 # SystemToolkit Wiki
 
-> 状态勘误（2026-10-09）：本文是开发阶段快照。当前构建为 App/Core/Tests 三个项目,功能模块统一位于 SystemToolkit.Core/Services，菜单只暴露已接入 UI 的功能。最新口径见仓库根 README 与 SystemToolkit/README.md。
+> 文档状态（2026-11-26）：已同步至 v1.4.0。当前构建为 App/Core/Tests 三个项目，功能模块统一位于 SystemToolkit.Core/Services，菜单只暴露已接入 UI 的 30 个功能页面。最新口径见仓库根 README 与 SystemToolkit/README.md。
 
 欢迎使用 SystemToolkit！本 Wiki 包含详细的使用指南、功能说明和常见问题解答。
 
@@ -29,7 +29,7 @@
 
 #### 方式 1: 从 GitHub Releases 下载
 
-1. 访问 [Releases 页面](https://github.com/SamHub1991/NetTool/releases)
+1. 访问 [Releases 页面](https://github.com/doubao01/NetTool/releases)
 2. 下载最新的 `SystemToolkit-v*.zip` 文件
 3. 解压到任意目录
 4. 双击运行 `SystemToolkit.App.exe`
@@ -37,7 +37,7 @@
 #### 方式 2: 从源码编译
 
 ```bash
-git clone https://github.com/SamHub1991/NetTool.git
+git clone https://github.com/doubao01/NetTool.git
 cd NetTool/SystemToolkit
 dotnet restore
 dotnet build -c Release
@@ -193,6 +193,46 @@ dotnet run --project SystemToolkit.App
 - Hash 计算（MD5/SHA1/SHA256/SHA384/SHA512）
 - Base64 编解码
 
+#### 颜色工具
+**功能**:
+- HEX/RGB/HSL/HSV/CMYK 五格式互转，输入自动识别
+- WCAG 对比度计算与 AA/AAA 判定，推荐可读前景色
+- 互补/三角/类似色/明度阶梯调色板生成
+- Windows 屏幕取色（仅 Windows 可用）
+
+#### 格式转换
+**功能**:
+- YAML 与 JSON 双向互转
+- JSONPath 查询（`$`、`.key`、`[n]`、`[*]`、`..key`、切片、负索引）
+- Markdown 转 HTML（CommonMark，含表格与任务列表）
+- 文本或文件生成二维码 PNG
+- 图片与 Base64 文本互转
+
+#### 离线工具箱（54 项）
+全部本地执行、无网络依赖，覆盖 JSON/CSV/URL/HTML/HEX/Base32/Base64/GZip/时间戳/进制/颜色/Cron/CRC32/文本差异/摩斯电码等常用转换与校验。
+
+---
+
+### 7. 效率工具
+
+#### 剪贴板历史
+**功能**:
+- 文本剪贴板监听，自动去重并置顶
+- 关键词搜索、条目固定、复制回剪贴板
+- 清空未固定项
+
+#### 命令面板
+**用法**:
+1. 按 `Ctrl+K` 或点击侧边栏「快速跳转」
+2. 输入功能名、分类或关键词（支持中英文）
+3. 回车直达对应功能页
+
+#### 图片批量处理
+**功能**:
+- 按最长边或百分比批量缩放
+- 输出 PNG/JPEG/BMP，可选择质量
+- 处理前预览目标尺寸，处理后汇总体积变化
+
 ---
 
 ## ❓ 常见问题
@@ -230,7 +270,7 @@ dotnet run --project SystemToolkit.App
 
 ### Q7: 如何报告 Bug 或建议新功能？
 
-**A**: 请访问 GitHub Issues: https://github.com/SamHub1991/NetTool/issues
+**A**: 请访问 GitHub Issues: https://github.com/doubao01/NetTool/issues
 
 ---
 
@@ -260,6 +300,15 @@ dotnet test SystemToolkit.Tests
 
 ## 📜 版本历史
 
+### v1.4.0 (2026-11-26) - 效率工具增强
+
+**新功能**:
+- ✅ 颜色工具（五格式互转、WCAG 对比度、调色板、屏幕取色）
+- ✅ 格式转换（YAML/JSON 互转、JSONPath、Markdown 转 HTML、二维码、图片 Base64）
+- ✅ 图片批量处理（最长边/百分比缩放）
+- ✅ 剪贴板历史（文本监听、搜索、固定、复制回写）
+- ✅ 命令面板（Ctrl+K 快速跳转）
+
 ### v1.0.0 (2026-01-XX) - 初始版本
 
 **新功能**:
@@ -279,9 +328,9 @@ dotnet test SystemToolkit.Tests
 
 ## 🔗 相关链接
 
-- **GitHub 仓库**: https://github.com/SamHub1991/NetTool
-- **问题反馈**: https://github.com/SamHub1991/NetTool/issues
-- **发布说明**: https://github.com/SamHub1991/NetTool/releases
+- **GitHub 仓库**: https://github.com/doubao01/NetTool
+- **问题反馈**: https://github.com/doubao01/NetTool/issues
+- **发布说明**: https://github.com/doubao01/NetTool/releases
 
 ---
 
@@ -289,6 +338,6 @@ dotnet test SystemToolkit.Tests
 
 **邀请注册**: [MonkeyCode AI](https://monkeycode-ai.com/?ic=019e4e77-519b-70dc-82ea-2a833e5e93da)
 
-最后更新：2026-01-XX
+最后更新：2026-11-26
 
 </div>

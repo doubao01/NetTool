@@ -255,10 +255,10 @@ public sealed class ConversionService : IConversionService
         return JsonValue.Create(value);
     }
 
-    private static object? ConvertToPlainObject(JsonNode node) => node switch
+    private static object? ConvertToPlainObject(JsonNode? node) => node switch
     {
         JsonObject obj => obj.ToDictionary(pair => pair.Key, pair => ConvertToPlainObject(pair.Value)),
-        JsonArray array => array.Select(ConvertToPlainObject).ToList(),
+        JsonArray array => array.Select(item => ConvertToPlainObject(item)).ToList(),
         JsonValue value => ToPrimitive(value),
         _ => null
     };

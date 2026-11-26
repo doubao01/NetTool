@@ -5,14 +5,14 @@
 ### 前置要求
 
 在开始之前，请确保已安装：
-- **.NET 10.0 SDK** ([下载链接](https://dotnet.microsoft.com/download/dotnet/8.0))
+- **.NET 10.0 SDK** ([下载链接](https://dotnet.microsoft.com/download/dotnet/10.0))
 - **Visual Studio 2022** (推荐) 或 **VSCode**
 - **Windows 10/11** 操作系统
 
 ### 步骤 1: 下载项目
 
 ```bash
-git clone https://github.com/yourusername/SystemToolkit.git
+git clone https://github.com/doubao01/NetTool.git
 cd SystemToolkit
 ```
 
@@ -104,10 +104,10 @@ dotnet run --project SystemToolkit.App
 A: 部分功能（如服务管理、进程终止）需要管理员权限。右键点击应用，选择"以管理员身份运行"。
 
 **Q: 某些功能显示"开发中"？**
-A: v1.0.0 版本中部分功能为基础实现，将在后续版本完善。
+A: 菜单只展示已实现功能，未接入 UI 的能力不会出现在导航中。
 
 **Q: 如何报告 Bug？**
-A: 访问 GitHub Issues: https://github.com/yourusername/SystemToolkit/issues
+A: 访问 GitHub Issues: https://github.com/doubao01/NetTool/issues
 
 ---
 
@@ -117,5 +117,5 @@ A: 访问 GitHub Issues: https://github.com/yourusername/SystemToolkit/issues
 
 ---
 
-**文档版本**: 1.0.0  
-**最后更新**: 2026-01-XX
+**文档版本**: 1.4.0  
+**最后更新**: 2026-11-26

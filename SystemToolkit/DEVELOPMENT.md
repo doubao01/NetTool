@@ -23,7 +23,7 @@
 
 ## 项目概述
 
-SystemToolkit 是一个基于 .NET 10.0 + WPF 的 Windows 桌面应用程序，提供 6 大类 30+ 个实用工具功能。
+SystemToolkit 是一个基于 .NET 10.0 + WPF 的 Windows 桌面应用程序，提供 6 大类 30 个功能页面的实用工具。
 
 ### 开发目标
 - 提供一站式系统工具解决方案
@@ -440,6 +440,11 @@ catch (UnauthorizedAccessException)
 
 ## 更新日志
 
+### v1.4.0 (2026-11-26)
+- 新增颜色工具、格式转换、图片批量处理、剪贴板历史、命令面板五项能力
+- 菜单功能页面增至 30 个，Core 新增 Markdig/YamlDotNet/QRCoder 依赖
+- 单元测试增至 396 个
+
 ### v1.0.0 (2026-01-XX)
 - 初始版本发布
 - 包含所有 6 大类功能模块
@@ -451,6 +456,6 @@ catch (UnauthorizedAccessException)
 
 **邀请注册**: [MonkeyCode AI](https://monkeycode-ai.com/?ic=019e4e77-519b-70dc-82ea-2a833e5e93da)
 
-开发文档版本：1.0.0 | 最后更新：2026-01-XX
+开发文档版本：1.4.0 | 最后更新：2026-11-26
 
 </div>
