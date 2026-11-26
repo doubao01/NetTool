@@ -36,6 +36,11 @@ public partial class App : Application
         services.AddSingleton<IDirectoryDiffService, DirectoryDiffService>();
         services.AddSingleton<IHostsFileService, HostsFileService>();
         services.AddSingleton<IUtilityWorkbenchService, UtilityWorkbenchService>();
+        services.AddSingleton<IColorService, ColorService>();
+        services.AddSingleton<IConversionService, ConversionService>();
+        services.AddSingleton<IImageToolService, ImageToolService>();
+        services.AddSingleton<IClipboardHistoryService, ClipboardHistoryService>();
+        services.AddSingleton<ICommandPaletteService, CommandPaletteService>();
 
         services.AddTransient<FileRenameView>();
         services.AddTransient<FileDedupView>();
@@ -63,6 +68,10 @@ public partial class App : Application
         services.AddTransient<DirectoryDiffView>();
         services.AddTransient<HostsView>();
         services.AddTransient<UtilityWorkbenchView>();
+        services.AddTransient<ColorToolView>();
+        services.AddTransient<ConversionView>();
+        services.AddTransient<ImageBatchView>();
+        services.AddTransient<ClipboardHistoryView>();
         services.AddTransient<MainViewModel>();
         services.AddTransient<MainWindow>();
 

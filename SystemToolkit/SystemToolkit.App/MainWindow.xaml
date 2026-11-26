@@ -23,6 +23,12 @@
                 </Border>
                 
                 <!-- 菜单列表 -->
+                <Border DockPanel.Dock="Top" Padding="10,6">
+                    <Button x:Name="CommandPaletteButton" Content="快速跳转 (Ctrl+K)"
+                            Click="CommandPaletteButton_Click" HorizontalContentAlignment="Left"
+                            Padding="8,5" Background="#3E3E42" Foreground="#DDDDDD" BorderThickness="0"/>
+                </Border>
+
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <TreeView x:Name="MenuTreeView" BorderThickness="0" Background="Transparent"
                               SelectedItemChanged="MenuTreeView_SelectedItemChanged">
@@ -39,7 +45,7 @@
                 <!-- 底部信息 -->
                 <Border DockPanel.Dock="Bottom" Background="#252526" Padding="15,10">
                     <StackPanel>
-                        <TextBlock Text="Version 1.0.0" FontSize="11" Foreground="#888888"/>
+                        <TextBlock Text="Version 1.4.0" FontSize="11" Foreground="#888888"/>
                         <TextBlock Text="Powered by MonkeyCode" FontSize="10" Foreground="#666666" Margin="0,3,0,0"/>
                         <TextBlock Text="https://monkeycode-ai.com" FontSize="10" Foreground="#0099CC" 
                                    MouseDown="WebsiteLink_MouseDown" Cursor="Hand" Margin="0,2,0,0"/>

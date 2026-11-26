@@ -63,3 +63,13 @@ This file records user instructions, preferences, and teachings for reference in
 - Context: NetTool 仓库提交与推送
 - Instructions:
   - 不要为改动创建功能分支，直接在 master 上提交并推送；临时分支需删除（本地与远程）。
+
+[Project Knowledge Summary]
+- Date: 2026-11-26
+- Context: 在本机为 SystemToolkit 新增 v1.4 功能并完成编译与测试验证
+- Category: Build Methods
+- Instructions:
+  - 本环境无全局 dotnet，可用 SDK 位于 `/tmp/dotnet10`，执行前需 `export DOTNET_ROOT=/tmp/dotnet10 PATH=/tmp/dotnet10:$PATH DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1`。
+  - 编译：`dotnet build SystemToolkit/SystemToolkit.sln -c Debug`；测试：`dotnet test SystemToolkit/SystemToolkit.Tests/SystemToolkit.Tests.csproj -c Debug`。v1.4 完成后为 0 警告 0 错误、396 用例全绿。
+  - Core 新增第三方依赖：Markdig 1.6.0、YamlDotNet 18.1.0、QRCoder 1.9.0，首次需联网还原。
+  - 新增功能页同步点共四处：Core 服务与模型、App 视图、`App.xaml.cs` 的 DI 注册、`MainViewModel` 菜单与命令面板关键词；另需更新两份 README 的功能计数。
