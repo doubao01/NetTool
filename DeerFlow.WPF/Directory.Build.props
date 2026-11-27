@@ -1,7 +1,7 @@
 <Project>
   <PropertyGroup>
     <!-- DeerFlow.WPF 版本（独立于 SystemToolkit 发布节奏） -->
-    <Version>1.4.0</Version>
+    <Version>1.4.1</Version>
     <Company>NetTool Team</Company>
     <Product>NetTool</Product>
     <Copyright>Copyright © NetTool Team</Copyright>
