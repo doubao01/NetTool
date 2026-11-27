@@ -26,7 +26,7 @@
                             Command="{Binding ToggleExperimentCenterCommand}"/>
                     <Button Content="📄 文档生成" Style="{StaticResource SecondaryButton}"
                             Padding="16,8" Margin="0,0,8,0"
-                            Click="ToggleDocumentGeneration_Click"/>
+                            Command="{Binding ToggleDocumentGenerationCommand}"/>
                     <Button Content="📊 刷新状态" Style="{StaticResource SecondaryButton}"
                             Padding="16,8"
                             Command="{Binding RefreshHealthCommand}"/>
@@ -46,7 +46,7 @@
                 <Border Grid.Row="0" x:Name="ExperimentCenterPanel"
                         Background="{StaticResource CardBackground}"
                         CornerRadius="12" Padding="28" Margin="0,0,0,24"
-                        Visibility="Collapsed">
+                        Visibility="{Binding ShowExperimentCenter, Converter={StaticResource BooleanToVisibilityConverter}}">
 
                     <Grid>
                         <Grid.RowDefinitions>
@@ -87,7 +87,7 @@
                 <Border Grid.Row="0" x:Name="DocumentGenerationPanel"
                         Background="{StaticResource CardBackground}"
                         CornerRadius="12" Padding="28" Margin="0,0,0,24"
-                        Visibility="Collapsed">
+                        Visibility="{Binding ShowDocumentGeneration, Converter={StaticResource BooleanToVisibilityConverter}}">
 
                     <local:DocumentPreviewControl/>
                 </Border>

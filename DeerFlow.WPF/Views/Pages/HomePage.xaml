@@ -131,12 +131,14 @@
                                             <ColumnDefinition Width="Auto"/>
                                         </Grid.ColumnDefinitions>
                                         <StackPanel Grid.Column="0">
-                                            <TextBlock Text="{Binding Title}" FontSize="14" FontWeight="SemiBold"
+                                            <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold"
                                                        Foreground="{StaticResource TextColor}"/>
-                                            <TextBlock Text="{Binding Status}" FontSize="12"
+                                            <TextBlock Text="{Binding Status, Converter={StaticResource TaskStatusToTextConverter}}"
+                                                       FontSize="12"
                                                        Foreground="{StaticResource TextMutedColor}" Margin="0,4,0,0"/>
                                         </StackPanel>
-                                        <TextBlock Grid.Column="1" Text="{Binding Progress, StringFormat={}{0}%}"
+                                        <TextBlock Grid.Column="1"
+                                                   Text="{Binding CpuUsagePercent, StringFormat={}{0:F1}% CPU}"
                                                    FontSize="12" Foreground="{StaticResource AccentColor}"
                                                    VerticalAlignment="Center"/>
                                     </Grid>

@@ -33,6 +33,9 @@
 
             <!-- 布尔值到状态文本转换器 -->
             <converters:BooleanToStatusTextConverter x:Key="BooleanToStatusTextConverter"/>
+
+            <!-- 任务状态枚举到中文文本转换器 -->
+            <converters:TaskStatusToTextConverter x:Key="TaskStatusToTextConverter"/>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

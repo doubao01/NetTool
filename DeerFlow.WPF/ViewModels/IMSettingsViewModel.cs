@@ -137,9 +137,6 @@ public class IMSettingsViewModel : ViewModelBase
     /// <summary>测试连接命令</summary>
     public RelayCommand TestConnectionCommand { get; }
 
-    /// <summary>切换启用状态命令</summary>
-    public RelayCommand ToggleEnabledCommand { get; }
-
     /// <summary>切换 Token 可见性命令</summary>
     public RelayCommand ToggleTokenVisibilityCommand { get; }
 
@@ -154,7 +151,6 @@ public class IMSettingsViewModel : ViewModelBase
         SaveConnectionCommand = new RelayCommand(new Action(async () => await SaveConnectionAsync()));
         DeleteConnectionCommand = new RelayCommand(new Action(async () => await DeleteConnectionAsync()));
         TestConnectionCommand = new RelayCommand(new Action(async () => await TestConnectionAsync()));
-        ToggleEnabledCommand = new RelayCommand(_ => ToggleEnabled());
         ToggleTokenVisibilityCommand = new RelayCommand(_ => IsTokenVisible = !IsTokenVisible);
 
         RefreshConnections();
@@ -287,11 +283,6 @@ public class IMSettingsViewModel : ViewModelBase
     /// <summary>
     /// 切换启用/禁用状态
     /// </summary>
-    private void ToggleEnabled()
-    {
-        EditingIsEnabled = !EditingIsEnabled;
-    }
-
     /// <inheritdoc/>
     protected override void Dispose(bool disposing)
     {

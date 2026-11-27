@@ -119,10 +119,32 @@ public class SettingsViewModel : ViewModelBase
 
     // 实验中心相关属性
     private bool _showExperimentCenter;
+    /// <summary>实验中心面板是否显示</summary>
     public bool ShowExperimentCenter
     {
         get => _showExperimentCenter;
-        set => SetProperty(ref _showExperimentCenter, value);
+        set
+        {
+            if (SetProperty(ref _showExperimentCenter, value) && value)
+            {
+                // 两个面板占据同一行，打开一个必须收起另一个
+                ShowDocumentGeneration = false;
+            }
+        }
+    }
+
+    private bool _showDocumentGeneration;
+    /// <summary>文档生成面板是否显示</summary>
+    public bool ShowDocumentGeneration
+    {
+        get => _showDocumentGeneration;
+        set
+        {
+            if (SetProperty(ref _showDocumentGeneration, value) && value)
+            {
+                ShowExperimentCenter = false;
+            }
+        }
     }
 
     private ObservableCollection<Experiment> _activeExperiments = new();
@@ -132,6 +154,7 @@ public class SettingsViewModel : ViewModelBase
     public RelayCommand ResetSettingsCommand { get; }
     public RelayCommand ToggleApiKeyVisibilityCommand { get; }
     public RelayCommand ToggleExperimentCenterCommand { get; }
+    public RelayCommand ToggleDocumentGenerationCommand { get; }
     public RelayCommand CreateExperimentCommand { get; }
     public RelayCommand AdoptBestStrategyCommand { get; }
     public RelayCommand RefreshHealthCommand { get; }
@@ -140,7 +163,9 @@ public class SettingsViewModel : ViewModelBase
     {
         _logger = logger;
         _secretStore = secretStore ?? new DpapiSecretStore();
-        _options = options ?? App.Services.GetService<IAppOptionsProvider>()?.Options ?? new AppOptions();
+        _options = options
+            ?? App.Services?.GetService<IAppOptionsProvider>()?.Options
+            ?? new AppOptions();
         _modelProvider = _options.DefaultProvider;
         _apiBaseUrl = _options.DefaultApiBaseUrl;
         _modelName = _options.DefaultModel;
@@ -151,12 +176,14 @@ public class SettingsViewModel : ViewModelBase
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "DeerFlow.WPF", SETTINGS_FILENAME);
 
-        _autoEvolver = App.Services.GetService<IAutoEvolver>();
+        _autoEvolver = App.Services?.GetService<IAutoEvolver>();
 
         SaveSettingsCommand = new RelayCommand(_ => SaveSettings());
         ResetSettingsCommand = new RelayCommand(_ => ResetSettings());
         ToggleApiKeyVisibilityCommand = new RelayCommand(_ => IsApiKeyVisible = !IsApiKeyVisible);
         ToggleExperimentCenterCommand = new RelayCommand(_ => ShowExperimentCenter = !ShowExperimentCenter);
+        ToggleDocumentGenerationCommand = new RelayCommand(
+            _ => ShowDocumentGeneration = !ShowDocumentGeneration);
         CreateExperimentCommand = new RelayCommand(_ => CreateExperiment());
         AdoptBestStrategyCommand = new RelayCommand(_ => AdoptBestStrategy());
         RefreshHealthCommand = new RelayCommand(_ => RefreshExperiments());
