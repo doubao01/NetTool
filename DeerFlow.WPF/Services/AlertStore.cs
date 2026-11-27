@@ -11,18 +11,41 @@ public class AlertStore : IDisposable
 {
     private readonly string _connectionString;
     private readonly object _syncRoot = new();
-    private bool _disposed;
+    private volatile bool _disposed;
+
+    /// <summary>默认单次读取上限</summary>
+    public const int DefaultLoadLimit = 200;
+
+    /// <summary>启动时一次性加载的历史告警上限</summary>
+    public const int StartupLoadLimit = 5000;
 
     public AlertStore(string? dbFilePath = null)
     {
-        var dataDir = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "DeerFlow.WPF");
-        Directory.CreateDirectory(dataDir);
+        if (string.IsNullOrWhiteSpace(dbFilePath))
+        {
+            // 默认落盘位置：LocalApplicationData，避免安装目录只读导致失败
+            var dataDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "DeerFlow.WPF");
+            Directory.CreateDirectory(dataDir);
+            dbFilePath = Path.Combine(dataDir, "alerts.db");
+        }
+        else
+        {
+            // 自定义路径可能是相对路径或多级目录，SQLite 不会自动创建父目录
+            var fullPath = Path.GetFullPath(dbFilePath);
+            var directory = Path.GetDirectoryName(fullPath);
+            if (!string.IsNullOrEmpty(directory))
+            {
+                Directory.CreateDirectory(directory);
+            }
+
+            dbFilePath = fullPath;
+        }
 
         _connectionString = new SqliteConnectionStringBuilder
         {
-            DataSource = dbFilePath ?? Path.Combine(dataDir, "alerts.db"),
+            DataSource = dbFilePath,
             DefaultTimeout = 30
         }.ToString();
 
@@ -80,7 +103,14 @@ public class AlertStore : IDisposable
                 INSERT INTO Alerts (Id, Type, Severity, Title, Message, CreatedAt, IsAcknowledged, RelatedTaskId, Context)
                 VALUES (@Id, @Type, @Severity, @Title, @Message, @CreatedAt, @IsAcknowledged, @RelatedTaskId, @Context)
                 ON CONFLICT(Id) DO UPDATE SET
-                    IsAcknowledged = excluded.IsAcknowledged";
+                    Type = excluded.Type,
+                    Severity = excluded.Severity,
+                    Title = excluded.Title,
+                    Message = excluded.Message,
+                    CreatedAt = excluded.CreatedAt,
+                    IsAcknowledged = excluded.IsAcknowledged,
+                    RelatedTaskId = excluded.RelatedTaskId,
+                    Context = excluded.Context";
             command.Parameters.AddWithValue("@Id", alert.Id);
             command.Parameters.AddWithValue("@Type", (int)alert.Type);
             command.Parameters.AddWithValue("@Severity", (int)alert.Severity);
@@ -97,6 +127,12 @@ public class AlertStore : IDisposable
     /// <summary>按时间倒序读取最近告警</summary>
     public List<Alert> Load(int limit = 200)
     {
+        // SQLite 把 LIMIT -1 当作不限制，负数/零会把整库读入内存，这里统一收敛
+        if (limit <= 0)
+        {
+            limit = DefaultLoadLimit;
+        }
+
         lock (_syncRoot)
         {
             using var connection = OpenConnection();
@@ -176,8 +212,19 @@ public class AlertStore : IDisposable
 
         try
         {
-            return JsonSerializer.Deserialize<Dictionary<string, object>>(json)
-                   ?? new Dictionary<string, object>();
+            using var document = JsonDocument.Parse(json);
+            if (document.RootElement.ValueKind != JsonValueKind.Object)
+            {
+                return new Dictionary<string, object>();
+            }
+
+            var result = new Dictionary<string, object>();
+            foreach (var property in document.RootElement.EnumerateObject())
+            {
+                result[property.Name] = ConvertElement(property.Value);
+            }
+
+            return result;
         }
         catch
         {
@@ -185,9 +232,26 @@ public class AlertStore : IDisposable
         }
     }
 
+    /// <summary>
+    /// 把 JsonElement 还原为常见 CLR 基元类型，避免调用方拿到 JsonElement 后强转失败
+    /// </summary>
+    private static object ConvertElement(JsonElement element) => element.ValueKind switch
+    {
+        JsonValueKind.String => element.GetString() ?? string.Empty,
+        JsonValueKind.Number => element.TryGetInt64(out var l) ? (object)l : element.GetDouble(),
+        JsonValueKind.True => true,
+        JsonValueKind.False => false,
+        JsonValueKind.Null or JsonValueKind.Undefined => string.Empty,
+        _ => element.GetRawText()
+    };
+
     public void Dispose()
     {
+        if (_disposed) return;
         _disposed = true;
-        SqliteConnection.ClearAllPools();
+
+        // 仅清理本库的连接池，避免 ClearAllPools 波及其它组件的 SQLite 连接
+        using var connection = new SqliteConnection(_connectionString);
+        SqliteConnection.ClearPool(connection);
     }
 }

@@ -125,8 +125,8 @@ public class AlertService : IAlertService
 {
     private readonly ILogger _logger;
     private readonly ConcurrentDictionary<string, Alert> _alerts = new();
-    private readonly object _lock = new();
     private readonly AlertStore? _store;
+    private readonly object _raiseLock = new();
 
     // 告警阈值配置
     private readonly double _negativeFeedbackThreshold = 0.3; // 负面反馈率超过 30% 触发告警
@@ -150,7 +150,8 @@ public class AlertService : IAlertService
         {
             try
             {
-                foreach (var alert in _store.Load())
+                // 启动加载使用更大上限，避免服务运行期已存在的告警在重启后被截断丢失
+                foreach (var alert in _store.Load(AlertStore.StartupLoadLimit))
                 {
                     _alerts.TryAdd(alert.Id, alert);
                 }
@@ -162,10 +163,40 @@ public class AlertService : IAlertService
         }
     }
 
+    /// <summary>同一告警在抑制窗口内只记录一次，避免轮询式检查刷屏</summary>
+    private static readonly TimeSpan DuplicateSuppressionWindow = TimeSpan.FromMinutes(10);
+
     /// <inheritdoc/>
     public string RaiseAlert(AlertType type, AlertSeverity severity, string title, string message,
         Dictionary<string, object>? context = null)
     {
+        // 查重与写入需原子完成，否则并发触发同一告警会各自判定"无重复"而写入多条
+        lock (_raiseLock)
+        {
+            return RaiseAlertLocked(type, severity, title, message, context);
+        }
+    }
+
+    private string RaiseAlertLocked(AlertType type, AlertSeverity severity, string title, string message,
+        Dictionary<string, object>? context)
+    {
+        // 类型 + 标题 + 正文都相同才算重复：正文含 taskId 等上下文，不同任务不会被误合并
+        var duplicate = _alerts.Values
+            .Where(a => a.Type == type && a.Title == title && a.Message == message && !a.IsAcknowledged)
+            .OrderByDescending(a => a.CreatedAt)
+            .FirstOrDefault(a => DateTime.Now - a.CreatedAt < DuplicateSuppressionWindow);
+        if (duplicate is not null)
+        {
+            // 同一事件再次触发时，若级别升高则就地升级，避免错过更严重状态
+            if ((int)severity > (int)duplicate.Severity)
+            {
+                duplicate.Severity = severity;
+                TryPersist(duplicate);
+            }
+
+            return duplicate.Id;
+        }
+
         var alert = new Alert
         {
             Type = type,
@@ -255,8 +286,21 @@ public class AlertService : IAlertService
         foreach (var id in toRemove)
         {
             _alerts.TryRemove(id, out _);
-            TryDelete(id);
         }
+
+        // 一次批量删除，避免逐条 DELETE 往返；内存已移除，DB 同步失败也不会留下可见残影
+        if (_store is not null)
+        {
+            try
+            {
+                _store.DeleteAcknowledged();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "[AlertService] 批量清除已确认告警失败");
+            }
+        }
+
         _logger.LogInformation("[AlertService] 已清除 {Count} 条已确认告警", toRemove.Count);
     }
 

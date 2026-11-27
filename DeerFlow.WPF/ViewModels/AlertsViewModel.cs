@@ -54,10 +54,13 @@ public class AlertsViewModel : ViewModelBase
     public RelayCommand DeleteCommand { get; }
     public RelayCommand ClearAcknowledgedCommand { get; }
 
-    public AlertsViewModel(ILoggerService logger)
+    /// <summary>
+    /// 告警中心视图模型。显式传入服务便于单元测试，缺省时从应用容器解析。
+    /// </summary>
+    public AlertsViewModel(ILoggerService logger, IAlertService? alertService = null)
     {
         _logger = logger;
-        _alertService = App.Services.GetService(typeof(IAlertService)) as IAlertService;
+        _alertService = alertService ?? ResolveAlertService();
 
         RefreshCommand = new RelayCommand(_ => Refresh());
         AcknowledgeCommand = new RelayCommand(_ => Acknowledge(), _ => SelectedAlert is { IsAcknowledged: false });
@@ -65,6 +68,19 @@ public class AlertsViewModel : ViewModelBase
         ClearAcknowledgedCommand = new RelayCommand(_ => ClearAcknowledged());
 
         Refresh();
+    }
+
+    private static IAlertService? ResolveAlertService()
+    {
+        try
+        {
+            return App.Services?.GetService(typeof(IAlertService)) as IAlertService;
+        }
+        catch
+        {
+            // 单元测试等未初始化应用容器场景，退化为 "服务未启用"
+            return null;
+        }
     }
 
     private void Refresh()
