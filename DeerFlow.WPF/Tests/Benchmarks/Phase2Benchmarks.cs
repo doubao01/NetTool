@@ -10,7 +10,9 @@ namespace DeerFlow.WPF.Tests.Benchmarks;
 
 /// <summary>
 /// Phase 2 性能基准测试
+/// 含绝对耗时断言，结果依赖运行机器，不纳入 CI 门禁（CI 过滤 Category!=Benchmark）
 /// </summary>
+[Trait("Category", "Benchmark")]
 public class Phase2Benchmarks
 {
     private readonly IFeedbackService _feedbackService;

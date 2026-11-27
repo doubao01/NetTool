@@ -74,7 +74,7 @@ jobs:
       run: dotnet build DeerFlow.WPF/DeerFlow.WPF.csproj -c Release --no-restore
 
     - name: 运行测试
-      run: dotnet test DeerFlow.WPF/Tests/DeerFlow.WPF.Tests.csproj -c Release --verbosity normal --filter "Category!=Integration"
+      run: dotnet test DeerFlow.WPF/Tests/DeerFlow.WPF.Tests.csproj -c Release --verbosity normal --filter "Category!=Integration&Category!=Benchmark"
 
     - name: 发布应用
       run: |
