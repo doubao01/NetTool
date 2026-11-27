@@ -15,13 +15,16 @@ namespace DeerFlow.WPF.Tests.Services;
 /// <summary>
 /// 按脚本返回固定文本的假聊天补全服务，用于验证智能体循环的控制流。
 /// 每次调用依次消费一条脚本；脚本耗尽后重复最后一条。
+/// 子智能体并发执行时会共享同一实例，取脚本必须加锁。
 /// </summary>
 public sealed class ScriptedChatCompletionService : IChatCompletionService
 {
     private readonly Queue<string> _script;
+    private readonly object _sync = new();
     private string _last = "无脚本内容";
+    private int _invocationCount;
 
-    public int InvocationCount { get; private set; }
+    public int InvocationCount => Volatile.Read(ref _invocationCount);
 
     public ScriptedChatCompletionService(IEnumerable<string> script)
     {
@@ -37,7 +40,7 @@ public sealed class ScriptedChatCompletionService : IChatCompletionService
         Kernel? kernel = null,
         CancellationToken cancellationToken = default)
     {
-        InvocationCount++;
+        Interlocked.Increment(ref _invocationCount);
         var text = Consume();
         IReadOnlyList<ChatMessageContent> result =
             new List<ChatMessageContent> { new(AuthorRole.Assistant, text) };
@@ -50,7 +53,7 @@ public sealed class ScriptedChatCompletionService : IChatCompletionService
         Kernel? kernel = null,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        InvocationCount++;
+        Interlocked.Increment(ref _invocationCount);
         var text = Consume();
         await Task.Yield();
         yield return new StreamingChatMessageContent(AuthorRole.Assistant, text);
@@ -58,12 +61,15 @@ public sealed class ScriptedChatCompletionService : IChatCompletionService
 
     private string Consume()
     {
-        if (_script.Count > 0)
+        lock (_sync)
         {
-            _last = _script.Dequeue();
-        }
+            if (_script.Count > 0)
+            {
+                _last = _script.Dequeue();
+            }
 
-        return _last;
+            return _last;
+        }
     }
 }
 
